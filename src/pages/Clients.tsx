@@ -1,0 +1,136 @@
+import { PageHeader } from "@/components/qh/PageHeader";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { StatusBadge } from "@/components/qh/StatusBadge";
+import { ParamCard, KPICard } from "@/components/qh/ParamCard";
+import { Users, Plus, Sparkles, MessageSquare, ClipboardList, Lightbulb, Star } from "lucide-react";
+import { clients, reclamationsClient, enquetesSatisfaction, suggestionsClient, typesClient, categoriesClient, regionsClient, typesReclamation, gravitesReclamation, typesDecision, typesSuggestion } from "@/lib/mock-data-extended";
+
+export default function Clients() {
+  const satMoy = (clients.reduce((s, c) => s + c.satisfaction, 0) / clients.length).toFixed(1);
+  return (
+    <div>
+      <PageHeader
+        icon={<Users className="h-5 w-5" />}
+        title="Clients & Parties Intéressées"
+        description="Réclamations, satisfaction, suggestions clients (ISO 9.1.2)"
+        iso="9.1.2"
+        actions={<><Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> Sentiment IA</Badge><Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouveau client</Button></>}
+      />
+
+      <div className="grid gap-3 md:grid-cols-4 mb-4">
+        <KPICard title="Clients" value={clients.length} />
+        <KPICard title="Satisfaction moy." value={`${satMoy}/5`} icon={<Star className="h-4 w-4 text-warning" />} />
+        <KPICard title="Réclamations" value={reclamationsClient.length} icon={<MessageSquare className="h-4 w-4" />} />
+        <KPICard title="Enquêtes actives" value={enquetesSatisfaction.length} icon={<ClipboardList className="h-4 w-4" />} />
+      </div>
+
+      <Tabs defaultValue="clients">
+        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+          <TabsTrigger value="clients">Clients</TabsTrigger>
+          <TabsTrigger value="reclamations">Réclamations</TabsTrigger>
+          <TabsTrigger value="satisfaction">Satisfaction</TabsTrigger>
+          <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
+          <TabsTrigger value="param">Paramétrage</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="clients" className="mt-4">
+          <Card><CardContent className="p-0"><Table>
+            <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Raison sociale</TableHead><TableHead>Type</TableHead><TableHead>Catégorie</TableHead><TableHead>Région</TableHead><TableHead>CA</TableHead><TableHead>Satisfaction</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {clients.map(c => (
+                <TableRow key={c.code}>
+                  <TableCell className="font-mono text-xs">{c.code}</TableCell>
+                  <TableCell><div className="font-medium">{c.raisonSociale}</div><div className="text-xs text-muted-foreground">{c.email}</div></TableCell>
+                  <TableCell><Badge variant="outline" className="text-[10px]">{c.type}</Badge></TableCell>
+                  <TableCell className="text-xs">{c.categorie}</TableCell>
+                  <TableCell className="text-xs">{c.region}</TableCell>
+                  <TableCell className="text-xs">{c.ca.toLocaleString()} MAD</TableCell>
+                  <TableCell><StatusBadge status={c.satisfaction >= 4 ? "conforme" : c.satisfaction >= 3 ? "surveillance" : "critique"} label={`${c.satisfaction}/5`} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table></CardContent></Card>
+        </TabsContent>
+
+        <TabsContent value="reclamations" className="mt-4 space-y-2">
+          {reclamationsClient.map(r => (
+            <Card key={r.ref}><CardContent className="pt-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{r.ref}</span>
+                    <StatusBadge status={r.gravite === "Critique" ? "critique" : r.gravite === "Majeure" ? "surveillance" : "info"} label={r.gravite} />
+                    <Badge variant="outline" className="text-[10px]">{r.type}</Badge>
+                    {r.avecRetour && <Badge variant="destructive" className="text-[10px]">Avec retour</Badge>}
+                    <Badge variant="secondary" className="text-[10px]">{r.statut === "traitee" ? "Traitée" : "Décision en cours"}</Badge>
+                  </div>
+                  <div className="font-medium mt-1">{r.client}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{r.date} · {r.site} · Décideur: {r.decideur}</div>
+                  {r.traitement && <div className="text-sm mt-2 p-2 rounded bg-muted/40">Traitement : {r.traitement}</div>}
+                </div>
+                {r.actionId && <Badge variant="outline" className="font-mono text-[10px]">{r.actionId}</Badge>}
+              </div>
+            </CardContent></Card>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="satisfaction" className="mt-4 space-y-3">
+          {enquetesSatisfaction.map(e => (
+            <Card key={e.ref}><CardContent className="pt-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{e.ref}</span>
+                    <Badge variant={e.mode === "client" ? "default" : "secondary"} className="text-[10px]">{e.mode === "client" ? "Mode client" : "Mode anonyme"}</Badge>
+                  </div>
+                  <div className="font-semibold mt-1">{e.titre}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{e.debut} → {e.fin}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold">{e.scoreMoyen}{e.mode === "anonyme" ? "/10" : "/5"}</div>
+                  <div className="text-xs text-muted-foreground">{e.repondants}/{e.total} répondants</div>
+                </div>
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full bg-gradient-primary" style={{ width: `${(e.repondants / e.total) * 100}%` }} /></div>
+            </CardContent></Card>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="suggestions" className="mt-4 space-y-2">
+          {suggestionsClient.map(s => (
+            <Card key={s.ref}><CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <Lightbulb className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{s.ref}</span>
+                    <Badge variant="outline" className="text-[10px]">{s.type}</Badge>
+                    <span className="text-xs text-muted-foreground">{s.date} · {s.client}</span>
+                  </div>
+                  <div className="text-sm mt-1.5">{s.contenu}</div>
+                </div>
+              </div>
+            </CardContent></Card>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="param" className="mt-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <ParamCard title="Types de clients" items={typesClient} />
+            <ParamCard title="Catégories" items={categoriesClient} />
+            <ParamCard title="Régions" items={regionsClient} />
+            <ParamCard title="Types de réclamations" items={typesReclamation} />
+            <ParamCard title="Gravités réclamations" items={gravitesReclamation} />
+            <ParamCard title="Types de décisions" items={typesDecision} />
+            <ParamCard title="Types de suggestions" items={typesSuggestion} />
+            <ParamCard title="Questionnaires satisfaction" items={["NPS standard", "Enquête trimestrielle complète", "Mini-enquête post-livraison"]} note="Questions: choix multiple, matrice, numérique, ouverte" />
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
