@@ -1,32 +1,48 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/qh/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/qh/StatusBadge";
-import { Target, Plus, Sparkles, Filter, ArrowRight, Clock, User, Link2 } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-
-const actions = [
-  { id: "ACT-001", titre: "Améliorer le contrôle douanier import", source: "Audit interne", pilote: "M. Cherkaoui", echeance: "15/05/2026", priorite: "Urgent", avancement: 65, statut: "surveillance" as const },
-  { id: "ACT-002", titre: "Formation chauffeurs ADR", source: "Plan formation", pilote: "K. Tazi", echeance: "30/06/2026", priorite: "Moyen", avancement: 30, statut: "conforme" as const },
-  { id: "ACT-003", titre: "Renouvellement étalonnage balance B-204", source: "Métrologie", pilote: "Y. Benjelloun", echeance: "05/05/2026", priorite: "Urgent", avancement: 10, statut: "critique" as const },
-  { id: "ACT-004", titre: "Réponse réclamation client #2451", source: "Clients", pilote: "S. El Idrissi", echeance: "10/05/2026", priorite: "Urgent", avancement: 80, statut: "conforme" as const },
-  { id: "ACT-005", titre: "Mise à jour fiche technique gasoil B7", source: "Veille réglementaire", pilote: "A. Benali", echeance: "20/05/2026", priorite: "Moyen", avancement: 45, statut: "surveillance" as const },
-];
-
-const sources = [
-  { name: "Audits", count: 8, color: "hsl(var(--primary))" },
-  { name: "Non-conformités", count: 12, color: "hsl(var(--destructive))" },
-  { name: "Risques (AMDEC)", count: 5, color: "hsl(var(--warning))" },
-  { name: "Clients", count: 4, color: "hsl(var(--accent))" },
-  { name: "Fournisseurs", count: 3, color: "hsl(var(--success))" },
-  { name: "Veille", count: 2, color: "hsl(var(--muted-foreground))" },
-];
+import { ParamCard, KPICard } from "@/components/qh/ParamCard";
+import {
+  Target, Plus, Sparkles, Filter, ArrowRight, Clock, User, Link2, Settings2, FileStack,
+  CheckCircle2, XCircle, Copy, Send, Workflow, Tag, AlertTriangle, ChevronRight,
+} from "lucide-react";
+import {
+  actions as initialActions, type ActionRecord, type SousAction, actionStatutMap,
+  typesAction, sourcesAction, typesCause, gravitesAction, prioritesAction, themesAction, modelesAction,
+} from "@/lib/mock-data-extended";
+import { directions, metiers, sites, employees } from "@/lib/mock-data";
+import { toast } from "sonner";
 
 export default function Actions() {
-  const [filter, setFilter] = useState<"all" | "urgent" | "encours">("all");
-  const filtered = filter === "urgent" ? actions.filter(a => a.priorite === "Urgent") : filter === "encours" ? actions.filter(a => a.avancement < 100) : actions;
+  const [actions, setActions] = useState<ActionRecord[]>(initialActions);
+  const [selected, setSelected] = useState<ActionRecord | null>(actions[0] ?? null);
+  const [filter, setFilter] = useState<"all" | "urgent" | "encours" | "validation">("all");
+  const [openNew, setOpenNew] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (filter === "urgent") return actions.filter(a => a.sousActions.some(s => s.priorite === "Urgente"));
+    if (filter === "encours") return actions.filter(a => a.statut === "en_cours" || a.statut === "validation");
+    if (filter === "validation") return actions.filter(a => a.statut === "validation" || a.statut === "demande");
+    return actions;
+  }, [actions, filter]);
+
+  const stats = useMemo(() => ({
+    total: actions.length,
+    encours: actions.filter(a => a.statut === "en_cours").length,
+    validation: actions.filter(a => a.statut === "validation" || a.statut === "demande").length,
+    cloturees: actions.filter(a => a.statut === "cloturee").length,
+    efficaciteMoy: Math.round(actions.flatMap(a => a.sousActions).filter(s => s.tauxEfficacite > 0).reduce((s, x) => s + x.tauxEfficacite, 0) / Math.max(1, actions.flatMap(a => a.sousActions).filter(s => s.tauxEfficacite > 0).length)),
+  }), [actions]);
 
   return (
     <div>
@@ -35,96 +51,300 @@ export default function Actions() {
         title="Plan d'Action"
         description="Hub central — système nerveux du SMQ. Centralise toutes les actions correctives, préventives et d'amélioration."
         iso="10.2"
-        actions={
-          <>
-            <Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> IA Coach</Badge>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> Nouvelle action</Button>
-          </>
-        }
+        actions={<>
+          <Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> IA Coach</Badge>
+          <Dialog open={openNew} onOpenChange={setOpenNew}>
+            <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouvelle action</Button></DialogTrigger>
+            <NewActionDialog onSubmit={() => { toast.success("Action enregistrée — circuit de validation déclenché"); setOpenNew(false); }} />
+          </Dialog>
+        </>}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-        {[
-          { l: "Total actions", v: 34, s: "info" as const },
-          { l: "En cours", v: 22, s: "conforme" as const },
-          { l: "Urgentes", v: 7, s: "critique" as const },
-          { l: "Taux d'efficacité", v: "82%", s: "conforme" as const },
-        ].map(k => (
-          <Card key={k.l}><CardContent className="p-4">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">{k.l}</div>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-2xl font-bold">{k.v}</span>
-              <StatusBadge status={k.s} />
-            </div>
-          </CardContent></Card>
-        ))}
+      <div className="grid gap-3 md:grid-cols-5 mb-4">
+        <KPICard title="Total actions" value={stats.total} />
+        <KPICard title="En cours" value={stats.encours} hint="Réalisation en cours" />
+        <KPICard title="En validation" value={stats.validation} hint="Demandes à valider" />
+        <KPICard title="Clôturées" value={stats.cloturees} />
+        <KPICard title="Efficacité moy." value={`${stats.efficaciteMoy}%`} hint="Sur sous-actions évaluées" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-        <div>
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as any)}>
-            <div className="flex items-center justify-between mb-3">
-              <TabsList>
-                <TabsTrigger value="all">Toutes ({actions.length})</TabsTrigger>
-                <TabsTrigger value="urgent">Urgentes</TabsTrigger>
-                <TabsTrigger value="encours">En cours</TabsTrigger>
-              </TabsList>
-              <Button variant="outline" size="sm"><Filter className="h-3.5 w-3.5 mr-1.5" /> Filtrer</Button>
-            </div>
-            <TabsContent value={filter} className="space-y-2">
-              {filtered.map(a => (
-                <Card key={a.id} className="hover:shadow-elegant hover:border-primary/30 transition-base">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex flex-col items-center gap-1 shrink-0">
-                        <span className="font-mono text-[10px] text-muted-foreground">{a.id}</span>
-                        <StatusBadge status={a.statut} label={a.priorite} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium">{a.titre}</div>
-                        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1"><Link2 className="h-3 w-3" /> {a.source}</span>
-                          <span className="flex items-center gap-1"><User className="h-3 w-3" /> {a.pilote}</span>
-                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {a.echeance}</span>
-                        </div>
-                        <div className="mt-3 flex items-center gap-3">
-                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full bg-gradient-primary" style={{ width: `${a.avancement}%` }} />
-                          </div>
-                          <span className="text-xs font-medium w-10 text-right">{a.avancement}%</span>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon" className="shrink-0"><ArrowRight className="h-4 w-4" /></Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </TabsContent>
-          </Tabs>
-        </div>
+      <Tabs defaultValue="actions">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+          <TabsTrigger value="actions" className="gap-1.5"><Target className="h-3.5 w-3.5" />Actions</TabsTrigger>
+          <TabsTrigger value="demandes" className="gap-1.5"><Workflow className="h-3.5 w-3.5" />Demandes</TabsTrigger>
+          <TabsTrigger value="modeles" className="gap-1.5"><FileStack className="h-3.5 w-3.5" />Modèles</TabsTrigger>
+          <TabsTrigger value="param" className="gap-1.5"><Settings2 className="h-3.5 w-3.5" />Paramétrage</TabsTrigger>
+        </TabsList>
 
-        <div className="space-y-4">
+        <TabsContent value="actions" className="mt-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+            <div>
+              <Tabs value={filter} onValueChange={v => setFilter(v as any)}>
+                <div className="flex items-center justify-between mb-2">
+                  <TabsList>
+                    <TabsTrigger value="all">Toutes</TabsTrigger>
+                    <TabsTrigger value="encours">En cours</TabsTrigger>
+                    <TabsTrigger value="urgent">Urgent</TabsTrigger>
+                    <TabsTrigger value="validation">Validation</TabsTrigger>
+                  </TabsList>
+                </div>
+              </Tabs>
+              <div className="space-y-2 max-h-[700px] overflow-y-auto pr-1">
+                {filtered.map(a => {
+                  const s = actionStatutMap[a.statut];
+                  const avancement = a.sousActions.length ? Math.round(a.sousActions.reduce((x, sa) => x + sa.tauxRealisation, 0) / a.sousActions.length) : 0;
+                  return (
+                    <button key={a.id} onClick={() => setSelected(a)} className={`w-full text-left p-3 rounded-lg border transition-base ${selected?.id === a.id ? "bg-primary/8 border-primary/30" : "hover:bg-muted/40"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{a.reference}</span>
+                        <StatusBadge status={s.status} label={s.label} />
+                      </div>
+                      <div className="font-medium text-sm mt-1">{a.titre}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
+                        <span><Tag className="h-3 w-3 inline mr-0.5" />{a.type}</span>
+                        <span>·</span>
+                        <span><Link2 className="h-3 w-3 inline mr-0.5" />{a.source}</span>
+                      </div>
+                      {a.sousActions.length > 0 && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full bg-gradient-primary" style={{ width: `${avancement}%` }} /></div>
+                          <span className="text-[10px] font-medium w-9 text-right">{avancement}%</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="min-w-0">
+              {selected ? <ActionDetail action={selected} /> : (
+                <Card><CardContent className="pt-12 pb-12 text-center text-muted-foreground"><Target className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Sélectionnez une action.</p></CardContent></Card>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="demandes" className="mt-4 space-y-3">
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm">Sources d'actions</CardTitle><CardDescription className="text-xs">Flux centralisés</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="text-base">Workflow demande → validation → action</CardTitle><CardDescription>Une demande devient une action après validation successive selon le circuit paramétré par site et source.</CardDescription></CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                {[
+                  { l: "Demande", a: "Demandeur" }, { l: "Validation 1", a: "Resp. ordre 1" },
+                  { l: "Validation 2", a: "Resp. ordre 2" }, { l: "Action active", a: "—" },
+                  { l: "Réalisation", a: "Resp. réalisation" }, { l: "Suivi efficacité", a: "Resp. suivi" },
+                  { l: "Clôture", a: "Resp. clôture" },
+                ].map((s, i, arr) => (
+                  <div key={s.l} className="flex items-center gap-2 shrink-0">
+                    <div className="px-3 py-2 rounded-lg border bg-card text-center min-w-[110px]">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.a}</div>
+                      <div className="font-semibold text-sm">{s.l}</div>
+                    </div>
+                    {i < arr.length - 1 && <ArrowRight className="h-4 w-4 text-muted-foreground" />}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-base">Demandes d'actions à valider</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              {sources.map(s => (
-                <div key={s.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: s.color }} /><span>{s.name}</span></div>
-                  <Badge variant="secondary">{s.count}</Badge>
+              {actions.filter(a => a.statut === "demande" || a.statut === "validation" || a.statut === "refusee").map(a => (
+                <div key={a.id} className="border rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{a.reference}</span>
+                        <StatusBadge status={actionStatutMap[a.statut].status} label={actionStatutMap[a.statut].label} />
+                        <Badge variant="outline" className="text-[10px]">{a.type}</Badge>
+                      </div>
+                      <div className="font-medium mt-1">{a.titre}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Demandeur: {a.demandeur} · {a.dateCreation}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => toast.success("Action validée — alerte au validateur suivant")}><CheckCircle2 className="h-4 w-4 mr-1.5" />Valider</Button>
+                      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => toast.error("Demande refusée")}><XCircle className="h-4 w-4 mr-1.5" />Refuser</Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex gap-1 flex-wrap">
+                    {a.validateurs.map(v => <Badge key={v.name} variant={v.valide === true ? "default" : v.valide === "refus" ? "destructive" : "outline"} className="text-[10px]">{v.ordre}. {v.name} {v.valide === true ? "✓" : v.valide === "refus" ? "✕" : "…"}</Badge>)}
+                  </div>
                 </div>
               ))}
             </CardContent>
           </Card>
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Suggestion IA</CardTitle></CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <p>L'action <span className="font-mono text-xs">ACT-003</span> risque un retard. Cause probable suggérée :</p>
-              <p className="italic text-muted-foreground">« Délai prestataire d'étalonnage non bloqué dans le calendrier maintenance »</p>
-              <Button size="sm" variant="outline" className="w-full">Appliquer la suggestion</Button>
+        </TabsContent>
+
+        <TabsContent value="modeles" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Modèles d'action réutilisables</CardTitle>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouveau modèle</Button>
+              </div>
+              <CardDescription>Permet de réutiliser des plans d'action types — remplacer en-tête + sous-actions, ou ajouter uniquement les sous-actions.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {modelesAction.map(m => (
+                <Card key={m.id} className="hover:border-primary/40 transition-base">
+                  <CardContent className="pt-4">
+                    <FileStack className="h-5 w-5 text-primary mb-2" />
+                    <div className="font-medium text-sm">{m.titre}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{m.sousActions} sous-actions types</div>
+                    <div className="flex gap-2 mt-3">
+                      <Button size="sm" variant="outline" className="flex-1"><Copy className="h-3.5 w-3.5 mr-1" />Utiliser</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="param" className="mt-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <ParamCard title="Types d'actions" items={typesAction} />
+            <ParamCard title="Sources d'actions" items={sourcesAction} note="Détermine le module d'origine" />
+            <ParamCard title="Types de causes" items={typesCause} note="Méthode 5M" />
+            <ParamCard title="Niveaux de gravité" items={gravitesAction} />
+            <ParamCard title="Niveaux de priorité" items={prioritesAction} />
+            <ParamCard title="Thèmes" items={themesAction.map(t => `${t.ordre}. ${t.name}`)} />
+            <ParamCard title="Responsables de validation (par site × source)" items={[`Casablanca HQ × Audit interne → Direction Qualité (1), Direction Générale (2)`, `Tanger Med × NC Produit → Anas Benali (1), Direction Logistique (2)`, `Marrakech × Réclamation Client → Anas Benali (1)`]} note="Validation successive selon ordre" />
+            <ParamCard title="Responsables de clôture (par site)" items={sites.map(s => `${s} → Anas Benali`)} note="Un seul suffit pour clôturer" />
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function ActionDetail({ action }: { action: ActionRecord }) {
+  const s = actionStatutMap[action.statut];
+  const avancement = action.sousActions.length ? Math.round(action.sousActions.reduce((x, sa) => x + sa.tauxRealisation, 0) / action.sousActions.length) : 0;
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{action.reference}</span>
+                <Badge variant="outline" className="text-[10px]">{action.type}</Badge>
+                <Badge variant="secondary" className="text-[10px]">{action.source}</Badge>
+              </div>
+              <CardTitle className="mt-1">{action.titre}</CardTitle>
+              <CardDescription>{action.description}</CardDescription>
+            </div>
+            <StatusBadge status={s.status} label={s.label} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-2 text-sm">
+            <Field label="Direction pilote" value={action.directionPilote} />
+            <Field label="Métier" value={action.metier} />
+            <Field label="Thème" value={action.theme} />
+            <Field label="Site" value={action.site} />
+            <Field label="Demandeur" value={action.demandeur} />
+            <Field label="Date création" value={action.dateCreation} />
+            <Field label="Causes (5M)" value={action.causes.join(", ") || "—"} />
+            <div>
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Avancement global</div>
+              <div className="mt-1 flex items-center gap-2">
+                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-gradient-primary" style={{ width: `${avancement}%` }} /></div>
+                <span className="text-xs font-medium">{avancement}%</span>
+              </div>
+            </div>
+          </div>
+          {action.cloture && (
+            <div className="mt-3 p-2 rounded bg-success/10 border border-success/30 text-sm flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-success" />Clôturée par {action.cloture.responsable} le {action.cloture.date}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Sous-actions ({action.sousActions.length})</CardTitle>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline"><Copy className="h-3.5 w-3.5 mr-1" />Dupliquer</Button>
+              <Button size="sm"><Plus className="h-3.5 w-3.5 mr-1" />Ajouter</Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {action.sousActions.length === 0 ? (
+            <p className="text-sm text-muted-foreground p-4">Aucune sous-action.</p>
+          ) : (
+            <Table>
+              <TableHeader><TableRow><TableHead>Libellé</TableHead><TableHead>Resp. réalisation</TableHead><TableHead>Resp. suivi</TableHead><TableHead>Délai</TableHead><TableHead>Réal.</TableHead><TableHead>Eff.</TableHead><TableHead>Priorité</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {action.sousActions.map(sa => (
+                  <TableRow key={sa.id}>
+                    <TableCell className="text-sm max-w-xs">{sa.libelle}</TableCell>
+                    <TableCell className="text-xs">{sa.respRealisation}</TableCell>
+                    <TableCell className="text-xs">{sa.respSuivi}</TableCell>
+                    <TableCell className="text-xs">{sa.delai}</TableCell>
+                    <TableCell><div className="flex items-center gap-1.5"><div className="h-1.5 w-12 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary" style={{ width: `${sa.tauxRealisation}%` }} /></div><span className="text-[10px]">{sa.tauxRealisation}%</span></div></TableCell>
+                    <TableCell><div className="flex items-center gap-1.5"><div className="h-1.5 w-12 bg-muted rounded-full overflow-hidden"><div className="h-full bg-success" style={{ width: `${sa.tauxEfficacite}%` }} /></div><span className="text-[10px]">{sa.tauxEfficacite}%</span></div></TableCell>
+                    <TableCell><Badge variant={sa.priorite === "Urgente" ? "destructive" : "outline"} className="text-[10px]">{sa.priorite}</Badge></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {action.rapportEfficacite && (
+        <Card className="border-success/30 bg-success/5">
+          <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Rapport d'efficacité</CardTitle></CardHeader>
+          <CardContent className="text-sm">{action.rapportEfficacite}</CardContent>
+        </Card>
+      )}
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" />Analyse IA</CardTitle></CardHeader>
+        <CardContent className="text-sm space-y-2">
+          <p>Historique similaire détecté : <span className="font-mono text-xs">ACT-2025-118</span> avec efficacité finale 92%.</p>
+          <p className="text-muted-foreground italic">Suggestion : ajouter une sous-action de "communication post-réalisation" — corrélation forte avec l'efficacité finale.</p>
+          <Button size="sm" variant="outline">Appliquer la suggestion</Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b border-border pb-2">
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="font-medium mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+function NewActionDialog({ onSubmit }: { onSubmit: () => void }) {
+  return (
+    <DialogContent className="max-w-2xl">
+      <DialogHeader><DialogTitle>Nouvelle action</DialogTitle><DialogDescription>L'IA suggère un modèle adapté selon le type et la source.</DialogDescription></DialogHeader>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="md:col-span-2"><Label>Désignation</Label><Input placeholder="Titre de l'action…" /></div>
+        <div><Label>Type</Label><Select><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{typesAction.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
+        <div><Label>Source</Label><Select><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{sourcesAction.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+        <div><Label>Direction pilote</Label><Select><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{directions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
+        <div><Label>Métier</Label><Select><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{metiers.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select></div>
+        <div><Label>Thème</Label><Select><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{themesAction.map(t => <SelectItem key={t.name} value={t.name}>{t.name}</SelectItem>)}</SelectContent></Select></div>
+        <div><Label>Site</Label><Select><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{sites.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+        <div className="md:col-span-2"><Label>Description / Problème</Label><Textarea rows={3} placeholder="Décrire le problème ou l'objet de l'action…" /></div>
+        <div className="md:col-span-2"><Label>Causes (5M)</Label>
+          <div className="flex gap-2 flex-wrap mt-1">{typesCause.map(c => <Badge key={c} variant="outline" className="cursor-pointer hover:bg-muted">{c}</Badge>)}</div>
         </div>
       </div>
-    </div>
+      <DialogFooter><Button onClick={onSubmit}>Enregistrer la demande</Button></DialogFooter>
+    </DialogContent>
   );
 }
