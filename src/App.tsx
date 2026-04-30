@@ -12,6 +12,8 @@ import AuthPage from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Documentation from "./pages/Documentation";
 import Actions from "./pages/Actions";
+import RH from "./pages/RH";
+import Audits from "./pages/Audits";
 import Profil from "./pages/Profil";
 import NotFound from "./pages/NotFound";
 
@@ -31,13 +33,13 @@ const App = () => (
               <Route path="/documentation" element={<Documentation />} />
               <Route path="/actions" element={<Actions />} />
               <Route path="/profil" element={<Profil />} />
-              <Route path="/audits" element={<ModulePlaceholder slug="audits" />} />
+              <Route path="/audits" element={<Audits />} />
               <Route path="/non-conformites" element={<ModulePlaceholder slug="non-conformites" />} />
               <Route path="/risques" element={<ModulePlaceholder slug="risques" />} />
               <Route path="/indicateurs" element={<ModulePlaceholder slug="indicateurs" />} />
               <Route path="/clients" element={<ModulePlaceholder slug="clients" />} />
               <Route path="/fournisseurs" element={<ModulePlaceholder slug="fournisseurs" />} />
-              <Route path="/rh" element={<ModulePlaceholder slug="rh" />} />
+              <Route path="/rh" element={<RH />} />
               <Route path="/smart-release" element={<ModulePlaceholder slug="smart-release" />} />
               <Route path="/metrologie" element={<ModulePlaceholder slug="metrologie" />} />
               <Route path="/veille" element={<ModulePlaceholder slug="veille" />} />
