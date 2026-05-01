@@ -83,7 +83,7 @@ export default function PartiesInteressees() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard title="Parties identifiées" value={parties.length} icon={<Users className='h-4 w-4' />} />
         <KPICard title="Besoins / attentes" value={allBesoins.length} icon={<Bell className='h-4 w-4' />} />
-        <KPICard title="Taux de conformité" value={`${tauxConformite}%`} icon={CheckCircle2} />
+        <KPICard title="Taux de conformité" value={`${tauxConformite}%`} icon={<CheckCircle2 className='h-4 w-4' />} />
         <KPICard title="Écarts ouverts" value={allBesoins.filter(b => b.statut === "Écart").length} icon={<AlertCircle className='h-4 w-4' />} />
       </div>
 
