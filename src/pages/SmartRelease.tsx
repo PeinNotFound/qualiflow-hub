@@ -94,10 +94,10 @@ export default function SmartRelease() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KPICard label="Lots en contrôle" value={lots.filter(l => l.statut === "En contrôle").length} icon={ShieldCheck} />
-        <KPICard label="Bloqués" value={lots.filter(l => l.statut === "Bloqué").length} icon={Lock} />
-        <KPICard label="Libérés (mois)" value={lots.filter(l => l.statut === "Libéré").length} icon={CheckCircle2} trend={{ value: 12, positive: true }} />
-        <KPICard label="Taux de libération 1er passage" value="92%" icon={Sparkles} />
+        <KPICard title="Lots en contrôle" value={lots.filter(l => l.statut === "En contrôle").length} icon={<ShieldCheck className='h-4 w-4' />} />
+        <KPICard title="Bloqués" value={lots.filter(l => l.statut === "Bloqué").length} icon={<Lock className='h-4 w-4' />} />
+        <KPICard title="Libérés (mois)" value={lots.filter(l => l.statut === "Libéré").length} icon={CheckCircle2} />
+        <KPICard title="Taux de libération 1er passage" value="92%" icon={<Sparkles className='h-4 w-4' />} />
       </div>
 
       <Tabs defaultValue="dashboard">

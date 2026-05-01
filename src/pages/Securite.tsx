@@ -43,10 +43,10 @@ export default function Securite() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KPICard label="Utilisateurs actifs" value={42} icon={UserCheck} />
-        <KPICard label="Profils configurés" value={4} icon={Shield} />
-        <KPICard label="Anomalies IA (7j)" value={3} icon={AlertTriangle} />
-        <KPICard label="Logs (jour)" value="1 247" icon={Activity} />
+        <KPICard title="Utilisateurs actifs" value={42} icon={<UserCheck className='h-4 w-4' />} />
+        <KPICard title="Profils configurés" value={4} icon={<Shield className='h-4 w-4' />} />
+        <KPICard title="Anomalies IA (7j)" value={3} icon={<AlertTriangle className='h-4 w-4' />} />
+        <KPICard title="Logs (jour)" value="1 247" icon={<Activity className='h-4 w-4' />} />
       </div>
 
       <Tabs defaultValue="profils">
