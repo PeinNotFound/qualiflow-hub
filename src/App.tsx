@@ -14,6 +14,14 @@ import Documentation from "./pages/Documentation";
 import Actions from "./pages/Actions";
 import RH from "./pages/RH";
 import Audits from "./pages/Audits";
+import NonConformites from "./pages/NonConformites";
+import Risques from "./pages/Risques";
+import Indicateurs from "./pages/Indicateurs";
+import Clients from "./pages/Clients";
+import Fournisseurs from "./pages/Fournisseurs";
+import Metrologie from "./pages/Metrologie";
+import Reunions from "./pages/Reunions";
+import Conformite from "./pages/Conformite";
 import Profil from "./pages/Profil";
 import NotFound from "./pages/NotFound";
 
@@ -34,15 +42,17 @@ const App = () => (
               <Route path="/actions" element={<Actions />} />
               <Route path="/profil" element={<Profil />} />
               <Route path="/audits" element={<Audits />} />
-              <Route path="/non-conformites" element={<ModulePlaceholder slug="non-conformites" />} />
-              <Route path="/risques" element={<ModulePlaceholder slug="risques" />} />
-              <Route path="/indicateurs" element={<ModulePlaceholder slug="indicateurs" />} />
-              <Route path="/clients" element={<ModulePlaceholder slug="clients" />} />
-              <Route path="/fournisseurs" element={<ModulePlaceholder slug="fournisseurs" />} />
+              <Route path="/non-conformites" element={<NonConformites />} />
+              <Route path="/risques" element={<Risques />} />
+              <Route path="/indicateurs" element={<Indicateurs />} />
+              <Route path="/clients" element={<Clients />} />
+              <Route path="/fournisseurs" element={<Fournisseurs />} />
               <Route path="/rh" element={<RH />} />
+              <Route path="/reunions" element={<Reunions />} />
               <Route path="/smart-release" element={<ModulePlaceholder slug="smart-release" />} />
-              <Route path="/metrologie" element={<ModulePlaceholder slug="metrologie" />} />
-              <Route path="/veille" element={<ModulePlaceholder slug="veille" />} />
+              <Route path="/metrologie" element={<Metrologie />} />
+              <Route path="/veille" element={<Conformite />} />
+              <Route path="/conformite" element={<Conformite />} />
               <Route path="/planning" element={<ModulePlaceholder slug="planning" />} />
               <Route path="/ia-assistant" element={<ModulePlaceholder slug="ia-assistant" />} />
               <Route path="/securite" element={<ModulePlaceholder slug="securite" />} />
