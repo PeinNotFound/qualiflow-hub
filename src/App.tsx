@@ -22,6 +22,10 @@ import Fournisseurs from "./pages/Fournisseurs";
 import Metrologie from "./pages/Metrologie";
 import Reunions from "./pages/Reunions";
 import Conformite from "./pages/Conformite";
+import PartiesInteressees from "./pages/PartiesInteressees";
+import SmartRelease from "./pages/SmartRelease";
+import Planning from "./pages/Planning";
+import Securite from "./pages/Securite";
 import Profil from "./pages/Profil";
 import NotFound from "./pages/NotFound";
 
@@ -49,13 +53,14 @@ const App = () => (
               <Route path="/fournisseurs" element={<Fournisseurs />} />
               <Route path="/rh" element={<RH />} />
               <Route path="/reunions" element={<Reunions />} />
-              <Route path="/smart-release" element={<ModulePlaceholder slug="smart-release" />} />
+              <Route path="/smart-release" element={<SmartRelease />} />
               <Route path="/metrologie" element={<Metrologie />} />
               <Route path="/veille" element={<Conformite />} />
               <Route path="/conformite" element={<Conformite />} />
-              <Route path="/planning" element={<ModulePlaceholder slug="planning" />} />
+              <Route path="/parties-interessees" element={<PartiesInteressees />} />
+              <Route path="/planning" element={<Planning />} />
               <Route path="/ia-assistant" element={<ModulePlaceholder slug="ia-assistant" />} />
-              <Route path="/securite" element={<ModulePlaceholder slug="securite" />} />
+              <Route path="/securite" element={<Securite />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

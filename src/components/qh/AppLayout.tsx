@@ -2,6 +2,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Search, User as UserIcon } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+import { AIChatWidget } from "./AIChatWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
@@ -64,6 +65,7 @@ export const AppLayout = () => {
             <Outlet />
           </main>
         </div>
+        <AIChatWidget />
       </div>
     </SidebarProvider>
   );

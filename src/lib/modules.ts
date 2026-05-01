@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, FileText, ClipboardCheck, AlertTriangle, ShieldAlert,
   Target, Activity, Users, Truck, UserCog, PackageCheck, Gauge,
-  Newspaper, Calendar, Lock, Sparkles
+  Newspaper, Calendar, Lock, Sparkles, HeartHandshake
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -27,7 +27,8 @@ export const modules: ModuleDef[] = [
   { slug: "actions", title: "Plan d'Action", short: "Actions", description: "Hub central — actions correctives, préventives et d'amélioration", icon: Target, group: "processus", iso: "10.2" },
   { slug: "indicateurs", title: "Indicateurs (KPI)", short: "Pilotage", description: "Tableaux de bord temps réel et analyse prédictive", icon: Activity, group: "processus", iso: "9.1" },
 
-  { slug: "clients", title: "Clients & Parties Intéressées", short: "Clients", description: "Réclamations, satisfaction, attentes des parties intéressées", icon: Users, group: "processus", iso: "9.1.2" },
+  { slug: "clients", title: "Clients", short: "Clients", description: "Réclamations, satisfaction, enquêtes NPS", icon: Users, group: "processus", iso: "9.1.2" },
+  { slug: "parties-interessees", title: "Parties Intéressées", short: "Parties Int.", description: "Attentes & besoins (légaux, financiers, sociaux) — notification responsables", icon: HeartHandshake, group: "processus", iso: "4.2" },
   { slug: "fournisseurs", title: "Fournisseurs", short: "Achats", description: "Évaluation, sélection prédictive et veille des contrats", icon: Truck, group: "processus", iso: "8.4" },
   { slug: "rh", title: "Ressources Humaines", short: "GRH", description: "Compétences, formation, habilitations dynamiques", icon: UserCog, group: "processus", iso: "7.1.2" },
 
