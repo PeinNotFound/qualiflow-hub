@@ -435,7 +435,7 @@ export default function Conformite() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {employees.slice(0, 2).map(e => (
-                            <Badge key={e.id} variant="secondary" className="text-xs">{e.nom}</Badge>
+                            <Badge key={e.id} variant="secondary" className="text-xs">{e.fullName}</Badge>
                           ))}
                         </div>
                       </TableCell>
