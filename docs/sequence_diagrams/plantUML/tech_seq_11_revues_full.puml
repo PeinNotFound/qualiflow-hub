@@ -1,0 +1,57 @@
+@startuml TECH-SEQ-11-Revues-Full
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #EBF5FB
+skinparam ParticipantBorderColor #2980B9
+
+title Qualibot-Hub — Séquence Technique Détaillée : Workflow Revues de Direction & Processus (MERN)
+
+actor "Pilote / Administrateur" as User
+participant "React\nFront-End\n(RevueForm)" as UI
+participant "api.ts\n(Axios)" as Api
+participant "Express Router\n(/api/v1/revues)" as Router
+participant "RevueController" as Ctrl
+participant "AggregationService" as Service
+database "MongoDB\n(KPI, NC, Audit, Action)" as DB
+
+== Phase A : Initialisation & Auto-génération de la Revue ==
+User -> UI : Démarre une "Revue de Processus" (Sélectionne Période Q1-2026)
+UI -> Api : GET /api/v1/revues/processus/generate?period=Q1-2026&processus_id=xyz
+Api -> Router : HTTP GET
+Router -> Ctrl : generateProcessReviewDraft(req, res)
+
+Ctrl -> Service : aggregateRevueData(processus_id, periode)
+
+par Aggrégation Parallèle
+    Service -> DB : [1] Indicateur_Valeur.find({ periode }).populate('indicateurs')
+    Service -> DB : [2] NC.find({ processus_id, createdAt: { $in: periode } })
+    Service -> DB : [3] Audit.find({ processus_id, date: { $in: periode } })
+    Service -> DB : [4] Action.find({ processus_id, statut: 'cloturee' })
+end
+DB --> Service : Résultats Data
+
+Service -> Service : Synthétise & Résume Data\n(Calcul Matrice de Maturité, Taux Clôture Actions)
+Service --> Ctrl : RevueDraftData (KPIs, NCs_detected, Actions_closed_pct)
+
+Ctrl --> Api : HTTP 200 OK { draft: RevueDraftData }
+Api --> UI : Pré-remplit les champs de la Revue de Processus
+
+== Phase B : Saisie Humaine & Rapport ==
+User -> UI : Remplit les champs textuels (Points Forts, Opportunités d'Amélioration)
+UI -> Api : POST /api/v1/revues/processus
+Api -> Router : HTTP POST
+Router -> Ctrl : saveProcessReview(req, res)
+
+Ctrl -> DB : RevueProcessus.create({ ...draftData, constats: req.body.constats })
+DB --> Ctrl : revueDoc
+
+alt if Opportunities > 0
+    Ctrl -> Service : explodeConstatsIntoActions(revueDoc.constats)
+    Service -> DB : Action.insertMany([...]) (Pour chaque constat -> Opportunité d'Amélioration)
+end
+
+Ctrl --> Api : HTTP 201 Created { revue: revueDoc }
+Api --> UI : Redirige vers le Rapport Imprimable PDF
+
+@enduml

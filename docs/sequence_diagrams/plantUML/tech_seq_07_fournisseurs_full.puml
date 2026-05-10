@@ -1,0 +1,64 @@
+@startuml TECH-SEQ-07-Fournisseurs-Full
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #F4ECF7
+skinparam ParticipantBorderColor #8E44AD
+
+title Qualibot-Hub — Séquence Technique Détaillée : Workflow Fournisseurs (MERN)
+
+actor "Acheteur/Qualité" as User
+participant "React\nFront-End" as Client
+participant "api.ts\n(Axios)" as Api
+participant "Express Router\n(/api/v1/fournisseurs)" as Router
+participant "FournisseurController" as Ctrl
+participant "EvaluationService" as Service
+database "MongoDB\n(Fournisseur, Eval, NC)" as DB
+
+== Phase A : Évaluation Périodique ==
+User -> Client : Saisit les notes pour les critères (ex: Délai, Qualité)
+Client -> Api : POST /api/v1/fournisseurs/:id/evaluations
+Api -> Router : HTTP POST (JWT)
+Router -> Ctrl : evaluateFournisseur(req, res)
+
+Ctrl -> DB : Fournisseur.findById(id).populate('categorie_id')
+DB --> Ctrl : fourDoc
+
+Ctrl -> Service : calculateScore(req.body.notes_criteres, fourDoc.categorie_id)
+Service -> DB : Critere_Eval_Fournisseur.find({ type_produit_id: req.body.type_produit_id })
+DB --> Service : criteresDoc (avec coefficients)
+Service -> Service : score = Sum(note_saisie * coefficient) / 100
+Service --> Ctrl : score_final (ex: 45/100)
+
+Ctrl -> DB : Evaluation_Fournisseur.create({ fournisseur_id: id, notes_criteres, score_final })
+DB --> Ctrl : evalDoc
+
+alt if score_final < Seuil Acceptable (ex: 50)
+    Ctrl -> Service : triggerUnderperformanceAction(id, score_final)
+    Service -> DB : Fournisseur.updateOne({ _id: id }, { status: 'aSurveiller' })
+    Service -> DB : Action.create({ source_module: 'fournisseur', source_id: evalDoc._id, type_action: 'preventive' })
+    DB --> Service : actionDoc
+end
+
+Ctrl --> Api : HTTP 201 Created { evaluation: evalDoc, score: 45 }
+Api --> Client : UI Update ("Évaluation enregistrée, Fournisseur À Surveiller")
+
+== Phase B : Réclamation Fournisseur ==
+User -> Client : Déclare une réclamation suite à produit défectueux
+Client -> Api : POST /api/v1/fournisseurs/:id/reclamations
+Api -> Router : HTTP POST
+Router -> Ctrl : registerReclamation(req, res)
+
+Ctrl -> DB : Reclamation_Fournisseur.create(req.body)
+DB --> Ctrl : recDoc
+
+opt Si produit lié (Action Immédiate)
+    Ctrl -> DB : PNC_Fiche.create({ reclamation_fournisseur_id: recDoc._id, ... })
+    DB --> Ctrl : pncDoc
+    Ctrl -> DB : Reclamation_Fournisseur.updateOne({ pnc_id: pncDoc._id })
+end
+
+Ctrl --> Api : HTTP 201 Created
+Api --> Client : "Réclamation et PNC générées"
+
+@enduml

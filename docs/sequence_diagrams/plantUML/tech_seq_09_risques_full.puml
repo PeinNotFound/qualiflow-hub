@@ -1,0 +1,63 @@
+@startuml TECH-SEQ-09-Risques-Full
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #FDEDEC
+skinparam ParticipantBorderColor #CB4335
+
+title Qualibot-Hub — Séquence Technique Détaillée : Workflow Risques & AMDEC (MERN)
+
+actor "Pilote Processus" as User
+participant "React\nFront-End" as UI
+participant "api.ts\n(Axios)" as Api
+participant "Express Router\n(/api/v1/risques)" as Router
+participant "RisqueController" as Ctrl
+participant "RiskCalcService" as Service
+database "MongoDB\n(Risques, Criteres)" as DB
+
+== Phase A : Évaluation Initiale du Risque ==
+User -> UI : Saisit le risque (Cause, Événement, Enjeu) et les notes (Gravité, Occurrence, Détectabilité)
+UI -> Api : POST /api/v1/risques/fiches
+Api -> Router : HTTP POST (JWT)
+Router -> Ctrl : evaluateInitialRisk(req, res)
+
+Ctrl -> DB : Calcul_Methode.findById(req.body.methode_id)
+DB --> Ctrl : methodeDoc (Ex: { formule_texte: "G * O * D" })
+
+Ctrl -> Service : computeScore(req.body.notes_criteres, methodeDoc.formule_texte)
+Service -> Service : Parsing de la formule & Math.eval
+Service --> Ctrl : score_brut (Ex: 4 x 3 x 2 = 24)
+
+Ctrl -> DB : Risque_Domaine.findById(req.body.domaine_id)
+DB --> Ctrl : domaineDoc (seuil_criticite_acceptable = 15)
+
+Ctrl -> DB : Risque_Fiche.create({ ..., notes_criteres, score_brut, statut: 'initial' })
+DB --> Ctrl : risqueDoc
+
+alt score_brut > domaineDoc.seuil_criticite_acceptable
+    Ctrl -> DB : Action.create({ source_module: 'risque', source_id: risqueDoc._id, type_action: 'preventive' })
+    DB --> Ctrl : actionDoc
+    Ctrl -> DB : risqueDoc.actions.push(actionDoc._id); await risqueDoc.save()
+end
+
+Ctrl --> Api : HTTP 201 Created { fiche: risqueDoc }
+Api --> UI : Affiche Score Brut et Action Préventive
+
+== Phase B : Évaluation Résiduelle (Après Traitement) ==
+User -> UI : Réévalue les notes après exécution de l'Action Préventive
+UI -> Api : PUT /api/v1/risques/fiches/:id/residuel
+Api -> Router : HTTP PUT
+Router -> Ctrl : evaluateResidualRisk(req, res)
+
+Ctrl -> DB : Risque_Fiche.findById(req.params.id)
+DB --> Ctrl : risqueDoc
+
+Ctrl -> Service : computeScore(req.body.notes_criteres_residuels, methodeDoc.formule_texte)
+Service --> Ctrl : score_residuel (Ex: 4 x 1 x 2 = 8)
+
+Ctrl -> DB : risqueDoc.score_residuel = score_residuel; risqueDoc.statut = 'residuel'; await risqueDoc.save()
+
+Ctrl --> Api : HTTP 200 OK { fiche: risqueDoc }
+Api --> UI : Mise à jour de la cartographie des risques (Heatmap)
+
+@enduml

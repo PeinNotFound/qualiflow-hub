@@ -1,0 +1,202 @@
+@startuml DB-01 Identity & GRH
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam packageFontSize 12
+skinparam ClassBorderColor #2c3e50
+skinparam ClassBackgroundColor #ecf0f1
+
+title Qualibot-Hub — DB-01: Identity & GRH
+
+' ============================================================
+package "Identity & Security" #EBF5FB {
+
+  class User {
+    _id : ObjectId
+    --
+    name : String
+    email : String
+    passwordHash : String
+    role : Enum[admin, pilot, auditor, operator]
+    employee_id : ObjectId <<FK Employee>>
+    processus_id : ObjectId <<FK Processus>>
+    site_id : ObjectId <<FK Site>>
+    isActive : Boolean
+    lastLogin : Date
+    createdAt : Date
+  }
+
+  class Site {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+    adresse : String
+    responsables_validation : ObjectId[] <<FK Employee>>
+  }
+
+  class Direction {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+  }
+
+  class Metier {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+  }
+
+  class Processus {
+    _id : ObjectId
+    --
+    code : String
+    name : String
+    type : Enum[management, realisation, support]
+    pilote_id : ObjectId <<FK Employee>>
+    objectifs : String[]
+    entrees : String[]
+    sorties : String[]
+    periodicite_revue : Number <<months>>
+    isPublished : Boolean
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+package "GRH" #FEF9E7 {
+
+  class Employee {
+    _id : ObjectId
+    --
+    matricule : String
+    nom : String
+    prenom : String
+    email : String
+    poste_actuel : String
+    date_entree : Date
+    typeContrat : Enum[CDI, CDD, stagiaire]
+    processus_id : ObjectId <<FK Processus>>
+    site_id : ObjectId <<FK Site>>
+    direction_id : ObjectId <<FK Direction>>
+    metier_id : ObjectId <<FK Metier>>
+    fonction_id : ObjectId <<FK Fonction>>
+    is_Superviseur : Boolean
+    is_Auditeur_Interne : Boolean
+    is_Actif : Boolean
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Fonction {
+    _id : ObjectId
+    --
+    designation : String
+    code_doc_fiche_poste : ObjectId <<FK DocumentFile>>
+    qualifications_requises : QualifRequiseEmbed[]
+    createdAt : Date
+  }
+
+  class QualifRequiseEmbed <<embed>> {
+    qualification_id : ObjectId <<FK Qualification>>
+    niveau_requis : Number <<1-5>>
+  }
+
+  class Qualification {
+    _id : ObjectId
+    --
+    designation : String
+    type : Enum[informatique, technique, reglementaire, manageriale]
+    is_periodique : Boolean
+    frequence_mois : Number
+    responsable_id : ObjectId <<FK Employee>>
+    coefficient_ponderation : Number
+  }
+
+  class Habilitation {
+    _id : ObjectId
+    --
+    employee_id : ObjectId <<FK Employee>>
+    qualification_id : ObjectId <<FK Qualification>>
+    dateObtention : Date
+    dateExpiration : Date
+    status : Enum[valide, expire, enCours]
+    alertSent : Boolean
+    certificat_id : ObjectId <<FK DocumentFile>>
+  }
+
+  class Formation {
+    _id : ObjectId
+    --
+    theme : String
+    organisme : String
+    type : Enum[interne, externe]
+    date_prevue : Date
+    date_realisee : Date
+    cout : Number
+    statut : Enum[planifie, realise, annule]
+    score_chaud : ScoreChaudEmbed
+    score_froid : ScoreFroidEmbed
+    qualifications_validees : ObjectId[] <<FK Qualification>>
+    employee_ids : ObjectId[] <<FK Employee>>
+    createdAt : Date
+  }
+
+  class ScoreChaudEmbed <<embed>> {
+    note_contenu : Number <<0-5>>
+    note_animateur : Number <<0-5>>
+    note_organisation : Number <<0-5>>
+    commentaire : String
+  }
+
+  class ScoreFroidEmbed <<embed>> {
+    evaluateur_id : ObjectId <<FK Employee>>
+    taux_efficacite : Number <<0-100>>
+    qualifications_validees : Boolean
+    commentaire : String
+    date_evaluation : Date
+  }
+
+  class Formation_Demande {
+    _id : ObjectId
+    --
+    demandeur_id : ObjectId <<FK Employee>>
+    theme : String
+    justification : String
+    date_souhaitee : Date
+    statut : Enum[enAttente, approuve, rejete]
+    circuit_validation : ValidationStepEmbed[]
+    formation_id : ObjectId <<FK Formation>>
+    createdAt : Date
+  }
+
+  class ValidationStepEmbed <<embed>> {
+    ordre : Number
+    validateur_id : ObjectId <<FK Employee>>
+    statut : Enum[enAttente, approuve, rejete]
+    commentaire : String
+    date_decision : Date
+  }
+
+}
+
+' RELATIONSHIPS
+User "1" -- "0..1" Employee : linked to
+User "*" -- "1" Site : belongs to
+Employee "*" -- "1" Processus : pilote de
+Employee "*" -- "1" Site : works at
+Employee "*" -- "1" Direction : belongs to
+Employee "*" -- "1" Metier : has
+Employee "1" -- "1" Fonction : has profile
+Employee "1" -- "*" Habilitation : possede
+Employee "1" -- "*" Formation_Demande : demande
+Fonction "1" -- "*" QualifRequiseEmbed
+Formation "*" -- "*" Employee : concerne
+Formation "1" -- "1" ScoreChaudEmbed
+Formation "1" -- "1" ScoreFroidEmbed
+
+@enduml

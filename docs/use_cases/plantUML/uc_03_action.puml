@@ -1,0 +1,42 @@
+@startuml UC-03-Action
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+
+title Qualibot-Hub — Use Cases : Module Plan d'Actions
+
+actor "Demandeur" as Demandeur
+actor "Validateur\n(Circuit Hiérarchique)" as Validateur
+actor "Responsable\nRéalisation" as Realisateur
+actor "Responsable\nSuivi" as Suiveur
+actor "Responsable\nClôture" as Clotureur
+
+rectangle "Module Actions" {
+  usecase "Créer une Demande d'Action" as UC_Creer
+  usecase "Valider la Fiche Action" as UC_Valider
+  usecase "Enregistrer l'Avancement (Taux %)" as UC_Avancement
+  usecase "Saisir Dépenses et Preuves" as UC_Preuves
+  usecase "Évaluer Efficacité de l'Action" as UC_Efficacite
+  usecase "Clôturer Définitivement" as UC_Cloturer
+}
+
+Demandeur --> UC_Creer
+Validateur --> UC_Valider
+
+Realisateur --> UC_Avancement
+Realisateur --> UC_Preuves
+
+Suiveur --> UC_Efficacite
+Clotureur --> UC_Cloturer
+
+package "IA Qualibot-Hub" {
+  usecase "Suggérer Types de Causes" as UC_IA_Causes
+  usecase "Alerter sur Surcharge Employé" as UC_IA_Charge
+  usecase "Prédire Inefficacité" as UC_IA_Pred
+}
+
+UC_Creer .> UC_IA_Causes : <<include>>
+UC_Valider .> UC_IA_Charge : <<include>>
+UC_Valider .> UC_IA_Pred : <<include>>
+
+@enduml

@@ -1,0 +1,77 @@
+@startuml TECH-SEQ-05-KPI-Full
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #FDEBD0
+skinparam ParticipantBorderColor #E67E22
+
+title Qualibot-Hub — Séquence Technique Détaillée : Workflow KPI & Indicateur (MERN)
+
+actor "Pilote / Operateur" as User
+participant "React\nFront-End\n(Indicateurs.tsx)" as Client
+participant "api.ts\n(Axios)" as Api
+participant "Express Router\n(/api/v1/kpis)" as Router
+participant "Auth & Role\nMiddlewares" as Middleware
+participant "KPIController" as Ctrl
+participant "ChartService\n(Analytics)" as Service
+database "MongoDB\n(Indicateur, Valeur, Historique)" as DB
+
+== Phase A : Création & Paramétrage Indicateur ==
+User -> Client : Crée un nouvel indicateur (Type, Périodicité, Formule, Cible)
+Client -> Api : POST /api/v1/kpis
+Api -> Router : HTTP POST
+Router -> Middleware : verifyToken() & checkRole(['admin', 'pilot'])
+Middleware --> Router : next()
+Router -> Ctrl : createIndicateur(req, res)
+
+Ctrl -> DB : Indicateur.create(req.body)
+DB --> Ctrl : indicateurDoc
+
+Ctrl -> DB : Historique_Cible.create({ indicateur_id: indicateurDoc._id, valeur_cible: req.body.cible, seuil_nc: req.body.seuil_nc })
+DB --> Ctrl : cibleDoc
+Ctrl --> Api : HTTP 201 Created
+Api --> Client : UI Refresh
+
+== Phase B : Saisie des Valeurs Périodiques ==
+User -> Client : Saisit la valeur du mois (ex: Mars = 95%)
+Client -> Api : POST /api/v1/kpis/:id/valeurs
+Api -> Router : HTTP POST
+Router -> Middleware : verifyToken()
+Middleware --> Router : next()
+Router -> Ctrl : addValeur(req, res)
+
+Ctrl -> DB : Indicateur_Valeur.create({ indicateur_id: id, date_periode: '2026-03', valeur_saisie: 95, ... })
+DB --> Ctrl : valeurDoc
+
+Ctrl -> DB : Historique_Cible.findOne({ indicateur_id: id }).sort({ date_application: -1 })
+DB --> Ctrl : currentCible (cible: 98, seuil_nc: 90)
+
+Ctrl -> Ctrl : Analyse de conformité :\nvaleur_saisie (95) vs currentCible
+
+alt valeur_saisie < seuil_nc
+    note over Ctrl : Hors Tolérance -> Alerte Déclenchée
+    Ctrl -> Service : generateKPIAlert(id, 'Sous Seuil NC')
+    Service -> DB : Instancie une NC { source: 'indicateur', type_nc: 'operationnelle' }
+    DB --> Service : ncDoc
+    Service -> DB : Notification.create(...) pour le Pilote
+end
+
+Ctrl --> Api : HTTP 201 { data: valeurDoc, alertTriggered: false }
+Api --> Client : Notification Toast "Valeur enregistrée"
+
+== Phase C : Dashboard Analytics ==
+User -> Client : Ouvre le Dashboard KPI
+Client -> Api : GET /api/v1/kpis/dashboard?processus_id=xxx
+Api -> Router : HTTP GET
+Router -> Ctrl : getDashboardStats(req, res)
+
+Ctrl -> DB : Aggregate Pipelines (Match processus_id, Group by dates, etc.)
+DB --> Ctrl : aggregatedData (array of stats)
+
+Ctrl -> Service : formatForChartJS(aggregatedData)
+Service --> Ctrl : chartConfig (labels, datasets[])
+
+Ctrl --> Api : HTTP 200 OK { charts: chartConfig }
+Api --> Client : Render Recharts / Chart.js Canvas
+
+@enduml

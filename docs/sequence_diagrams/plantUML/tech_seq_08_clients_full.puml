@@ -1,0 +1,72 @@
+@startuml TECH-SEQ-08-Clients-Full
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #FEF9E7
+skinparam ParticipantBorderColor #F1C40F
+
+title Qualibot-Hub — Séquence Technique Détaillée : Workflow Clients & Enquêtes (MERN)
+
+actor "Client / Resp. Qualité" as User
+participant "React\nFront-End" as UI
+participant "api.ts\n(Axios)" as Api
+participant "Express Router\n(/api/v1/clients)" as Router
+participant "ClientController" as Ctrl
+database "MongoDB\n(Clients, Enquetes, Recla)" as DB
+
+== Phase A : Réclamation Client ==
+User -> UI : Saisit une réclamation (Client, Description, with_return=true)
+UI -> Api : POST /api/v1/clients/:id/reclamations
+Api -> Router : HTTP POST (JWT)
+Router -> Ctrl : createReclamation(req, res)
+
+Ctrl -> DB : Reclamation_Client.create(req.body)
+DB --> Ctrl : recDoc
+
+alt with_return == true (Affecte le produit physique)
+    Ctrl -> DB : PNC_Fiche.create({ reclamation_client_id: recDoc._id, source: 'client' })
+    DB --> Ctrl : pncDoc
+    Ctrl -> DB : recDoc.pnc_id = pncDoc._id; await recDoc.save()
+end
+
+Ctrl -> DB : Action.create({ source_module: 'reclamationClient', source_id: recDoc._id })
+DB --> Ctrl : actionDoc
+Ctrl -> DB : recDoc.action_id = actionDoc._id; await recDoc.save()
+
+Ctrl --> Api : HTTP 201 Created { reclamation: recDoc }
+Api --> UI : Affiche Succès
+
+== Phase B : Lancement d'Enquête de Satisfaction ==
+User -> UI : Configure Enquête (Template, Liste Clients, Mode)
+UI -> Api : POST /api/v1/clients/enquetes
+Api -> Router : HTTP POST
+Router -> Ctrl : launchEnquete(req, res)
+
+Ctrl -> DB : Enquete.create({ questionnaire_id, clients, lien_public: generateUUID() })
+DB --> Ctrl : enqueteDoc
+
+opt Mode == "Envoyer par Email"
+    Ctrl -> Ctrl : boucle for each client in enqueteDoc.clients
+    Ctrl -> DB : Client.findById(client_id).select('email_contact')
+    DB --> Ctrl : email
+    note over Ctrl : Déclenchement Service d'Envoi Mail\n(Ex: Nodemailer / Resend)
+end
+
+Ctrl --> Api : HTTP 201 Created { lien_public: "..." }
+Api --> UI : Affiche Dashboard Enquête
+
+== Phase C : Soumission de Réponse (Vue Publique) ==
+actor "Client Final" as ClientPublic
+ClientPublic -> UI : Ouvre le lien public de l'enquête
+UI -> Api : POST /api/v1/public/enquetes/:lien/reponse
+Api -> Router : HTTP POST (No JWT needed)
+Router -> Ctrl : submitReponse(req, res)
+
+Ctrl -> DB : Enquete.findOne({ lien_public: lien })
+DB --> Ctrl : enqueteDoc
+
+Ctrl -> DB : Enquete.updateOne({ _id: enqueteDoc._id }, { $push: { reponses: req.body.reponseEmbed } })
+Ctrl --> Api : HTTP 200 OK
+Api --> UI : "Merci pour votre participation"
+
+@enduml

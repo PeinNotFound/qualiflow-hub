@@ -1,0 +1,63 @@
+gantt
+    title Qualibot-Hub Development Roadmap - 3 Weeks
+    dateFormat  YYYY-MM-DD
+    axisFormat  W%U
+
+    section Sprint 1 - Foundation
+    BE-01 Express Server Setup          :done, be01, 2026-05-11, 1d
+    BE-02 MongoDB Mongoose Connect      :done, be02, after be01, 1d
+    BE-03 Models User Site Direction    :be03, after be02, 1d
+    BE-04 Auth Routes JWT               :be04, after be03, 1d
+    INF-01 Middleware verifyToken       :inf01, after be04, 1d
+    INF-02 Middleware RBAC Option-B     :inf02, after inf01, 2d
+    INF-03 Super Admin Seeder           :inf03, after be04, 1d
+    FE-01 Axios Client api.ts           :fe01, after be04, 1d
+    FE-02 Replace Supabase Auth         :fe02, after fe01, 1d
+    FE-03 Update ProtectedRoute         :fe03, after fe02, 1d
+
+    section Sprint 2 - GRH and Core
+    BE-05 Models GRH Employee Fonction  :be05, 2026-05-18, 2d
+    BE-06 Models Formation Demande      :be06, after be05, 1d
+    BE-07 WorkflowService validation    :be07, after be06, 2d
+    BE-08 Employee CRUD Routes          :be08, after be05, 1d
+    BE-09 Formation Demande Routes      :be09, after be07, 2d
+    BE-10 Processus Model CRUD          :be10, after be05, 1d
+    INF-04 User Role Management Routes  :inf04, after inf02, 1d
+    FE-04 Wire GRH Page                 :fe04, after be08, 2d
+
+    section Sprint 3 - Core QMS Modules
+    BE-11 Models NC Action Sous-Action  :be11, 2026-05-25, 2d
+    BE-12 ActionService instancierAction :crit, be12, after be11, 1d
+    BE-13 Action Full Workflow Routes   :crit, be13, after be12, 3d
+    BE-14 Models Audit Constat Checklist :be14, after be11, 2d
+    BE-15 Audit Ecart Workflow Routes   :be15, after be12, 3d
+    BE-16 Models KPI Indicateur Valeur  :be16, after be11, 2d
+    BE-17 KPI Routes Threshold Aggregate :be17, after be12, 3d
+    FE-05 Wire Actions Page             :fe05, after be13, 2d
+    FE-06 Wire Audits Page              :fe06, after be15, 2d
+    FE-07 Wire KPI Page Recharts        :fe07, after be17, 2d
+
+    section Sprint 4 - Secondary Modules
+    BE-18 PNC Workflow Routes           :be18, 2026-06-08, 3d
+    BE-19 Fournisseurs Eval Routes      :be19, 2026-06-08, 3d
+    BE-20 Clients Reclamation Enquete   :be20, after be18, 3d
+    BE-21 Metrologie RR Calc Routes     :be21, 2026-06-08, 2d
+    BE-22 Risques Formula Auto-Action   :be22, 2026-06-08, 2d
+    BE-23 Documentation Upload 5-Axes   :be23, 2026-06-08, 3d
+    FE-08 Wire PNC Page                 :fe08, after be18, 2d
+    FE-09 Wire Fournisseurs Clients     :fe09, after be20, 2d
+    FE-10 Wire Metrologie Risques       :fe10, after be22, 2d
+    FE-11 Documentation 5-Axis Layout   :fe11, after be23, 2d
+
+    section Sprint 5 - Reviews and Infrastructure
+    BE-24 RevueProcessus Aggregation    :crit, be24, 2026-06-22, 4d
+    BE-25 RevueDirection Summary Report :crit, be25, after be24, 3d
+    BE-26 Reunion CRUD Decision Routes  :be26, 2026-06-22, 2d
+    BE-27 VeilleItem PlanningEvent      :be27, 2026-06-22, 2d
+    INF-05 Notification Microservice    :crit, inf05, 2026-06-22, 1d
+    INF-06 Redis PubSub Event Emitters  :crit, inf06, after inf05, 2d
+    INF-07 SocketIO Real-Time Notifs    :inf07, after inf06, 2d
+    INF-08 Nodemailer Email Templates   :inf08, after inf06, 2d
+    FE-12 Revue Processus Direction UI  :fe12, after be25, 3d
+    FE-13 Notification Bell History     :fe13, after inf07, 2d
+    FE-14 Role-Based UI Restrictions    :fe14, after inf02, 2d

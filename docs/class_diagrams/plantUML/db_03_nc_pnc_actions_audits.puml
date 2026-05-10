@@ -1,0 +1,303 @@
+@startuml DB-03 NC PNC Actions Audits
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam packageFontSize 12
+skinparam ClassBorderColor #2c3e50
+skinparam ClassBackgroundColor #ecf0f1
+
+title Qualibot-Hub — DB-03: NC, PNC, Actions & Audits
+
+' Shared reference stubs
+class Processus <<stub>> {
+  _id : ObjectId
+  code : String
+}
+class Employee <<stub>> {
+  _id : ObjectId
+  nom : String
+}
+class DocumentFile <<stub>> {
+  _id : ObjectId
+  libelle : String
+}
+
+' ============================================================
+package "Non-Conformites" #FDEDEC {
+
+  class NC {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    titre : String
+    description : String
+    source_module : Enum[audit, client, fournisseur, smartrelease, metrologie, veille, pnc]
+    source_id : ObjectId
+    processus_id : ObjectId <<FK Processus>>
+    severity : Enum[mineure, majeure, critique]
+    type_nc : Enum[documentaire, operationnelle, systemique]
+    status : Enum[ouverte, enCours, cloturee]
+    detecte_par : ObjectId <<FK User>>
+    constat_at : Date
+    echeance : Date
+    actions : ObjectId[] <<FK Action>>
+    audit_flash_declenche : Boolean
+    closed_at : Date
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+package "PNC - Produits Non Conformes" #FDEDEC {
+
+  class Produit {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+    prix_unitaire : Number
+    personnes_a_informer : ObjectId[] <<FK Employee>>
+    processus_id : ObjectId <<FK Processus>>
+  }
+
+  class PNC_Parametre {
+    _id : ObjectId
+    --
+    type_nc : String
+    source_nc : String
+    gravite : String
+    atelier : String
+  }
+
+  class PNC_Fiche {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    date_detection : Date
+    date_livraison : Date
+    atelier : String
+    lieu_detection : Enum[interne, client]
+    processus_id : ObjectId <<FK Processus>>
+    reclamation_fournisseur_id : ObjectId <<FK Reclamation_Fournisseur>>
+    reclamation_client_id : ObjectId <<FK Reclamation_Client>>
+    nc_id : ObjectId <<FK NC>>
+    actions : ObjectId[] <<FK Action>>
+    createdAt : Date
+  }
+
+  class PNC_Detail <<embed>> {
+    produit_id : ObjectId <<FK Produit>>
+    type_nc_id : String
+    num_of : String
+    num_lot : String
+    qte_detectee : Number
+    qte_produite : Number
+  }
+
+  class Traitement_PNC <<embed>> {
+    type_traitement : Enum[retouche, rebut, derogation, acceptation]
+    decideur_id : ObjectId <<FK Employee>>
+    responsable_traitement_id : ObjectId <<FK Employee>>
+    responsable_suivi_id : ObjectId <<FK Employee>>
+    circuit_validation : ValidationStepEmbed[]
+    delai : Date
+    qte_rejetee : Number
+    valeur_rejet : Number
+    qte_declassee : Number
+    qte_acceptee : Number
+    cout_total : Number
+    status : Enum[enAttente, enCours, cloture]
+    closed_at : Date
+  }
+
+  class ValidationStepEmbed <<embed>> {
+    ordre : Number
+    validateur_id : ObjectId <<FK Employee>>
+    statut : Enum[enAttente, approuve, rejete]
+    commentaire : String
+    date_decision : Date
+  }
+
+}
+
+' ============================================================
+package "Plan d'Actions" #E8F8F5 {
+
+  class Action_Parametre {
+    _id : ObjectId
+    --
+    type_action : Enum[corrective, preventive, amelioration]
+    source_action : String
+    cause_type : Enum[humaine, materielle, methode, milieu, management]
+    priorite_libelle : String
+    priorite_poids : Number
+    gravite_libelle : String
+    gravite_poids : Number
+  }
+
+  class Action {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    designation : String
+    description_probleme : String
+    source_module : String
+    source_id : ObjectId
+    processus_id : ObjectId <<FK Processus>>
+    type_id : ObjectId <<FK Action_Parametre>>
+    direction_pilote_id : ObjectId <<FK Direction>>
+    metier_id : ObjectId <<FK Metier>>
+    theme_id : String
+    statut : Enum[enAttente, validee, refusee, enCours, cloturee]
+    cause_racine : String
+    methode_cause : Enum[5pourquoi, ishikawa]
+    responsable_cloture_id : ObjectId <<FK Employee>>
+    validation_finale : Boolean
+    circuit_validation : ValidationStepEmbed[]
+    sous_actions : ObjectId[] <<FK Sous_Action>>
+    taux_avancement : Number <<0-100>>
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Sous_Action {
+    _id : ObjectId
+    --
+    action_id : ObjectId <<FK Action>>
+    designation : String
+    date_echeance : Date
+    taux_realisation : Number <<0-100>>
+    taux_efficacite : Number <<0-100>>
+    commentaires : String
+    depenses : Number
+    responsable_realisation_id : ObjectId <<FK Employee>>
+    responsable_suivi_id : ObjectId <<FK Employee>>
+    preuves : ObjectId[] <<FK DocumentFile>>
+    statut : Enum[enAttente, enCours, realise, enRetard]
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Action_Log {
+    _id : ObjectId
+    --
+    action_id : ObjectId <<FK Action>>
+    user_id : ObjectId <<FK User>>
+    champ_modifie : String
+    ancienne_valeur : String
+    nouvelle_valeur : String
+    motif : String <<obligatoire>>
+    timestamp : Date
+  }
+
+}
+
+' ============================================================
+package "Audits" #EBF5FB {
+
+  class Audit_Parametre {
+    _id : ObjectId
+    --
+    champ_nom : String
+    champ_criticite : Enum[faible, moyen, critique]
+    champ_acces : ObjectId[] <<FK User>>
+    type_audit : Enum[interne, externe, flash]
+    auditeurs_qualifies : ObjectId[] <<FK Employee>>
+    circuit_validation_ids : ObjectId[] <<FK Employee>>
+    ecart_types : EcartTypeEmbed[]
+    gravites : GraviteEmbed[]
+  }
+
+  class EcartTypeEmbed <<embed>> {
+    libelle : String
+  }
+
+  class GraviteEmbed <<embed>> {
+    libelle : String
+    index_ordre : Number
+  }
+
+  class Audit {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    parametre_id : ObjectId <<FK Audit_Parametre>>
+    processus_id : ObjectId <<FK Processus>>
+    type : Enum[interne, externe, flash]
+    date_debut_prev : Date
+    date_fin_prev : Date
+    date_realisation : Date
+    etat : Enum[nonRealise, realise, valide]
+    auditeurs : ObjectId[] <<FK Employee>>
+    audites : ObjectId[] <<FK Employee>>
+    documents_associes : ObjectId[] <<FK DocumentFile>>
+    plan_activites : Plan_Audit_Activite[]
+    checklist : ChecklistItemEmbed[]
+    points_forts : String[]
+    ecarts : ObjectId[] <<FK Constat_Ecart>>
+    nc_ids : ObjectId[] <<FK NC>>
+    rapport_url : String
+    validateur_id : ObjectId <<FK Employee>>
+    createdAt : Date
+  }
+
+  class Plan_Audit_Activite <<embed>> {
+    heure_debut : String
+    heure_fin : String
+    lieu : String
+    objectif : String
+    personnes_a_rencontrer : ObjectId[] <<FK Employee>>
+  }
+
+  class ChecklistItemEmbed <<embed>> {
+    chapitre_iso : String
+    exigence : String
+    reponse : Enum[conforme, nonConforme, nonApplicable]
+    commentaire : String
+  }
+
+  class Constat_Ecart {
+    _id : ObjectId
+    --
+    audit_id : ObjectId <<FK Audit>>
+    type_ecart_id : String
+    gravite_id : String
+    description : String
+    audite_concerne_id : ObjectId <<FK Employee>>
+    chapitre_iso : String
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class ChecklistISO {
+    _id : ObjectId
+    --
+    chapitre : String
+    sous_chapitre : String
+    exigence : String
+    processus_ids : ObjectId[] <<FK Processus>>
+  }
+
+}
+
+' RELATIONSHIPS
+NC "*" -- "1" Processus : concerne
+NC "*" -- "*" Action : declenche
+
+PNC_Fiche "1" -- "*" PNC_Detail : details produits
+PNC_Fiche "1" -- "1" Traitement_PNC : traitement
+PNC_Fiche "1" -- "0..1" NC : liee a
+
+Action "1" -- "*" Sous_Action : decomposee en
+Action "1" -- "*" Action_Log : tracee par
+Action "*" -- "1" Processus : assignee a
+
+Audit "*" -- "1" Processus : porte sur
+Audit "*" -- "1" Audit_Parametre : parametree par
+Audit "1" -- "*" Constat_Ecart : genere
+Constat_Ecart "1" -- "0..1" Action : cree
+Audit "1" -- "*" NC : genere
+
+@enduml

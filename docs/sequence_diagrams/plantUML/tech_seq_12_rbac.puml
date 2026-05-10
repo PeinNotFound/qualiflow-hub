@@ -1,0 +1,49 @@
+@startuml TECH-SEQ-12-RBAC
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #E8F8F5
+skinparam ParticipantBorderColor #1ABC9C
+
+title Qualibot-Hub — Séquence Technique : Permissions Restreintes & RBAC (Option B)
+
+actor "Utilisateur\n(Rôle: Editor)" as User
+participant "React\nFront-End" as UI
+participant "Express Router\n(/api/v1/...)" as Router
+participant "AuthMiddleware\n(verifyToken)" as AuthMid
+participant "RoleMiddleware\n(checkProcessus)" as RoleMid
+participant "PNCController" as Ctrl
+database "MongoDB" as DB
+
+Note over UI, Ctrl: Exemple : L'éditeur tente d'éditer une PNC
+
+User -> UI : Modifie la PNC (ID: 123) et clique Sauvegarder
+UI -> Router : PUT /api/v1/pncs/123\nHeaders: { Authorization: "Bearer <token>" }
+
+Router -> AuthMid : execute(req, res, next)
+AuthMid -> AuthMid : jwt.verify(token, SECRET)
+AuthMid -> AuthMid : const payload = decoded\n{ _id: "abc", role: "editor", processus_id: "MAGASIN" }
+AuthMid -> Router : req.user = payload; next()
+
+Router -> RoleMid : requireGlobalRoleOrAreaAccess('editor', 'write')
+RoleMid -> DB : PNC_Fiche.findById(req.params.id)
+DB --> RoleMid : pncDoc (processus_id: "TRANSPORT")
+
+RoleMid -> RoleMid : Vérification Option B (Restreint)
+alt req.user.role == 'super_admin' ou 'admin'
+    RoleMid -> Router : next() (Accès global accordé)
+else req.user.role == 'editor'
+    alt req.user.processus_id == pncDoc.processus_id
+        RoleMid -> Router : next() (Le processus correspond = Accès accordé)
+    else Processus différents
+        RoleMid --> UI : HTTP 403 Forbidden\n("Vous n'avez pas les droits d'édition pour le processus Transport")
+        UI -> User : Affiche Erreur 403 / Accès Refusé
+    end
+end
+
+note over Router, Ctrl: Si succès...
+RoleMid -> Ctrl : updatePNC(req, res)
+Ctrl -> DB : Mongoose update(...)
+Ctrl --> UI : HTTP 200 OK
+
+@enduml

@@ -1,0 +1,49 @@
+@startuml TECH-SEQ-13-Notifications
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #FDEDEC
+skinparam ParticipantBorderColor #CB4335
+
+title Qualibot-Hub — Séquence Technique : Microservice de Notifications (Decoupled)
+
+participant "Client (React)" as UI
+participant "Express API\n(Main Server)" as API
+queue "Message Broker\n(Redis Pub/Sub ou RabbitMQ)" as Broker
+participant "Notification\nMicroservice" as Micro
+participant "Socket.IO\nService" as WSS
+database "MongoDB" as DB
+participant "Serveur SMTP\n(NodeMailer)" as SMTP
+
+== Déclenchement de l'événement ==
+UI -> API : POST /api/v1/actions (Créer une Action)
+API -> DB : Save Action (Statut: enAttente)
+DB --> API : actionDoc
+
+note over API: L'API principale n'attend pas l'envoi de l'email
+API -> Broker : publisher.publish('NOTIFICATION_EVENT', \n{ type: 'ACTION_CREATED', payload: actionDoc, targetUser: id })
+API --> UI : HTTP 201 Created (Réponse Rapide)
+
+== Traitement Asynchrone (Microservice) ==
+Broker -> Micro : Consomme le message (subscriber)
+Micro -> Micro : Parse l'événement (Extract targetUser, HTML Template)
+
+par Envoi Multicanal Asynchrone
+    
+    == 1. Traçabilité DB ==
+    Micro -> DB : Notification.create({\nuser_id, titre: 'Nouvelle Action', lu: false\n})
+    
+    == 2. Alerte In-App (WebSockets) ==
+    Micro -> WSS : emit('PUSH_NOTIF', { targetUser, message })
+    WSS -> UI : WebSocket Ping (App met à jour la "Cloche")
+    
+    == 3. Notification Email ==
+    Micro -> DB : User.findById(targetUser).select('email')
+    DB --> Micro : email_address
+    Micro -> Micro : Compiler HTML (Handlebars / template)
+    Micro -> SMTP : sendMail({ to: email, html: "..." })
+    SMTP --> Micro : Confirm Sent
+    
+end
+
+@enduml

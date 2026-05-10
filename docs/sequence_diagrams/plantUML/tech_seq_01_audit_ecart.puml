@@ -1,0 +1,47 @@
+@startuml TECH-SEQ-01-Audit-Ecart
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+skinparam ParticipantBackgroundColor #EBF5FB
+skinparam ParticipantBorderColor #2980B9
+
+title Qualibot-Hub — Séquence Technique : Déclaration Constat d'Écart (MERN)
+
+actor "Auditeur" as User
+participant "React Frontend\n(Audit Realisation)" as Client <<React>>
+participant "api.ts\n(Axios)" as Api <<Axios>>
+participant "AuditRoutes\n(/api/v1/audits)" as Router <<Express>>
+participant "AuthMiddleware" as Auth <<Middleware>>
+participant "AuditController" as Ctrl <<Controller>>
+participant "ActionService" as ActionSvc <<Service>>
+database "MongoDB" as DB <<Mongoose>>
+
+== Création du Constat ==
+User -> Client : Saisit description écart, choisit gravité
+Client -> Api : POST /api/v1/audits/:id/ecarts\n{ description, gravite_id, type_ecart_id }
+Api -> Router : HTTP POST (with JWT token)
+Router -> Auth : verifyToken(req, res, next)
+Auth -> Auth : Decode JWT, set req.user
+Auth --> Router : next()
+Router -> Ctrl : createEcart(req, res)
+
+== Transaction BD & Instanciation Action ==
+Ctrl -> DB : const audit = await Audit.findById(req.params.id)
+DB --> Ctrl : auditDoc
+Ctrl -> Ctrl : Valide que l'audit est 'en Cours'
+
+Ctrl -> DB : const newEcart = await Constat_Ecart.create({ audit_id, ...req.body })
+DB --> Ctrl : ecartDoc
+
+Ctrl -> ActionSvc : instancierAction(source="Audit", id=ecartDoc._id)
+ActionSvc -> DB : Action.create({ source_module: "Audit", source_id: ecart_id, statut: "enAttente" })
+DB --> ActionSvc : actionDoc
+
+Ctrl -> DB : newEcart.action_id = actionDoc._id; await newEcart.save()
+DB --> Ctrl : ecartSauve
+
+Ctrl --> Api : HTTP 201 Created { ecart: ecartSauve }
+Api --> Client : reponse
+Client -> User : Affiche Succès & Lien vers Action
+
+@enduml

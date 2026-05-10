@@ -1,0 +1,42 @@
+@startuml TECH-SEQ-03-Formation-Workflow
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+skinparam ParticipantBackgroundColor #FEF9E7
+skinparam ParticipantBorderColor #F1C40F
+
+title Qualibot-Hub — Séquence Technique : Workflow Validation Formation (MERN)
+
+actor "Demandeur" as User
+participant "React\n(/formations)" as Client <<React>>
+participant "api.ts" as Api <<Axios>>
+participant "FormationDemandeRoutes\n(/api/v1/formation-demandes)" as Router <<Express>>
+participant "FormationController" as Ctrl <<Controller>>
+participant "WorkflowService" as Workflow <<Service>>
+database "MongoDB" as DB <<Mongoose>>
+
+== Soumission de Demande ==
+User -> Client : Saisit le besoin en formation
+Client -> Api : POST /api/v1/formation-demandes
+Api -> Router : HTTP POST
+Router -> Ctrl : requestFormation(req, res)
+
+== Routing Dynamique (Site/Direction) ==
+Ctrl -> DB : const user = await User.findById(req.user.id).populate('employee_id')
+DB --> Ctrl : userDoc (with site_id)
+Ctrl -> Workflow : getHierarchyChain(userDoc.employee_id.site_id)
+Workflow -> DB : Site.findById(site_id).select('responsables_validation')
+DB --> Workflow : liste_responsables
+
+Workflow -> Workflow : construire Tableau steps\n({ validateur_id, ordre, statut: enAttente })
+Workflow --> Ctrl : validationSteps
+
+Ctrl -> DB : await Formation_Demande.create({ demandeur_id, ..., circuit_validation: validationSteps })
+DB --> Ctrl : demandeDoc
+Ctrl --> Api : HTTP 201 Created { demande: demandeDoc }
+Api --> Client : Succès
+Client -> User : "Demande transmise au superviseur"
+
+== Validation (Étape +1) ==
+note over Ctrl, DB: Un validateur accède à l'endpoint de validation : POST /:id/validate
+@enduml

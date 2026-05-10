@@ -1,0 +1,358 @@
+@startuml DB-04 Clients Fournisseurs SmartRelease Metrologie
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam packageFontSize 12
+skinparam ClassBorderColor #2c3e50
+skinparam ClassBackgroundColor #ecf0f1
+
+title Qualibot-Hub — DB-04: Clients, Fournisseurs, Smart-Release & Metrologie
+
+' Stubs
+class Action <<stub>> {
+  _id : ObjectId
+}
+class Processus <<stub>> {
+  _id : ObjectId
+  code : String
+}
+class Employee <<stub>> {
+  _id : ObjectId
+  nom : String
+}
+class DocumentFile <<stub>> {
+  _id : ObjectId
+  libelle : String
+}
+class NC <<stub>> {
+  _id : ObjectId
+  reference : String
+}
+
+' ============================================================
+package "Clients & Parties Interessees" #FEF9E7 {
+
+  class Client_Categorie {
+    _id : ObjectId
+    --
+    designation : String
+  }
+
+  class Client_Region {
+    _id : ObjectId
+    --
+    designation : String
+  }
+
+  class Client {
+    _id : ObjectId
+    --
+    code : String
+    raison_sociale : String
+    email_contact : String
+    telephone : String
+    region_id : ObjectId <<FK Client_Region>>
+    categorie_id : ObjectId <<FK Client_Categorie>>
+    type_id : String
+    createdAt : Date
+  }
+
+  class Reclamation_Client {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    date_rec : Date
+    client_id : ObjectId <<FK Client>>
+    type_rec_id : String
+    gravite_id : String
+    site_id : ObjectId <<FK Site>>
+    description : String
+    with_return : Boolean <<triggers PNC alert>>
+    pnc_id : ObjectId <<FK PNC_Fiche>>
+    decideur_id : ObjectId <<FK Employee>>
+    responsable_traitement_id : ObjectId <<FK Employee>>
+    responsable_suivi_id : ObjectId <<FK Employee>>
+    statut : Enum[saisie, decision, traitement, cloture]
+    cout_penalite : Number
+    autres_frais : Number
+    rapport_traitement : String
+    action_id : ObjectId <<FK Action>>
+    closed_at : Date
+    createdAt : Date
+  }
+
+  class Questionnaire_Template {
+    _id : ObjectId
+    --
+    titre : String
+    texte_intro : String
+    texte_fin : String
+    questions : ObjectId[] <<FK Question>>
+    createdAt : Date
+  }
+
+  class Question {
+    _id : ObjectId
+    --
+    questionnaire_id : ObjectId <<FK Questionnaire_Template>>
+    libelle : String
+    variable_id : String
+    type_question : Enum[choixMultiple, matriceSimple, matriceDouble, numerique, ouverte]
+    est_obligatoire : Boolean
+    est_unique : Boolean
+    limite_min : Number
+    limite_max : Number
+    options : String[]
+  }
+
+  class Enquete {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    questionnaire_id : ObjectId <<FK Questionnaire_Template>>
+    date_debut : Date
+    date_fin : Date
+    mode : Enum[client, anonyme]
+    clients : ObjectId[] <<FK Client>>
+    lien_public : String
+    reponses : ReponseEmbed[]
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class ReponseEmbed <<embed>> {
+    client_id : ObjectId <<FK Client>>
+    date_reponse : Date
+    answers : AnswerEmbed[]
+  }
+
+  class AnswerEmbed <<embed>> {
+    question_id : ObjectId <<FK Question>>
+    valeur : Mixed
+  }
+
+  class PartieInteressee {
+    _id : ObjectId
+    --
+    nom : String
+    type : Enum[interne, externe, tutelle, opinionPublique]
+    exigences : String[]
+    actions_associees : String[]
+    canal_communication : String
+    responsable_id : ObjectId <<FK User>>
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+package "Fournisseurs" #F4ECF7 {
+
+  class Fournisseur_Categorie {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+  }
+
+  class Type_Produit {
+    _id : ObjectId
+    --
+    designation : String
+    periodicite_evaluation : Number <<months>>
+  }
+
+  class Critere_Eval_Fournisseur {
+    _id : ObjectId
+    --
+    libelle : String
+    coefficient : Number <<weight 0-100>>
+    responsable_id : ObjectId <<FK Employee>>
+    type_produit_id : ObjectId <<FK Type_Produit>>
+  }
+
+  class Fournisseur {
+    _id : ObjectId
+    --
+    code : String
+    raison_sociale : String
+    contact : String
+    email : String
+    telephone : String
+    categorie_id : ObjectId <<FK Fournisseur_Categorie>>
+    produits_agrees : ProduitAgreeEmbed[]
+    contrat_expiry : Date
+    status : Enum[actif, asSurveiller, suspendu, inactif]
+    certifications : ObjectId[] <<FK DocumentFile>>
+    createdAt : Date
+  }
+
+  class ProduitAgreeEmbed <<embed>> {
+    type_produit_id : ObjectId <<FK Type_Produit>>
+    is_agree : Boolean
+  }
+
+  class Evaluation_Fournisseur {
+    _id : ObjectId
+    --
+    fournisseur_id : ObjectId <<FK Fournisseur>>
+    type_produit_id : ObjectId <<FK Type_Produit>>
+    date_eval : Date
+    notes_criteres : NoteCritereEmbed[]
+    score_final : Number <<sum(note*coef)/100>>
+    commentaire : String
+    preuves : ObjectId[] <<FK DocumentFile>>
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class NoteCritereEmbed <<embed>> {
+    critere_id : ObjectId <<FK Critere_Eval_Fournisseur>>
+    note_saisie : Number <<0-5>>
+  }
+
+  class Reclamation_Fournisseur {
+    _id : ObjectId
+    --
+    fournisseur_id : ObjectId <<FK Fournisseur>>
+    date_reclamation : Date
+    description : String
+    gravite : Enum[faible, moyen, critique]
+    pnc_id : ObjectId <<FK PNC_Fiche>>
+    action_id : ObjectId <<FK Action>>
+    statut : Enum[ouverte, traitee, close]
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+package "Smart-Release" #EEF8EE {
+
+  class SmartRelease {
+    _id : ObjectId
+    --
+    reference : String
+    designation : String
+    processus_id : ObjectId <<FK Processus>>
+    responsable_id : ObjectId <<FK User>>
+    date_controle : Date
+    status : Enum[enAttente, libere, bloque]
+    controls : ControlEmbed[]
+    autorise_par : ObjectId <<FK User>>
+    double_validation_required : Boolean
+    second_validateur_id : ObjectId <<FK User>>
+    certif_conformite_url : String
+    bon_livraison_url : String
+    nc_id : ObjectId <<FK NC>>
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class ControlEmbed <<embed>> {
+    intitule : String
+    specification : String
+    valeur_mesuree : String
+    instrument_id : ObjectId <<FK Equipement_Mesure>>
+    resultat : Enum[succes, echec, derogation]
+    commentaire : String
+  }
+
+}
+
+' ============================================================
+package "Metrologie" #FDEBD0 {
+
+  class Organisme_Metrologie {
+    _id : ObjectId
+    --
+    nom : String
+    contact : String
+    email : String
+    telephone : String
+    fournisseur_id : ObjectId <<FK Fournisseur>>
+  }
+
+  class Machine {
+    _id : ObjectId
+    --
+    nom_machine : String
+    processus_id : ObjectId <<FK Processus>>
+    axe2_ref : ObjectId <<FK DocumentationAxe>>
+  }
+
+  class Equipement_Mesure {
+    _id : ObjectId
+    --
+    code_id : String <<unique>>
+    designation : String
+    date_mise_en_service : Date
+    etat : Enum[conforme, horsService, aEtalonner, expire]
+    responsable_id : ObjectId <<FK Employee>>
+    machine_id : ObjectId <<FK Machine>>
+    processus_id : ObjectId <<FK Processus>>
+    fichier_fiche_vie : ObjectId <<FK DocumentFile>>
+    action_id : ObjectId <<FK Action>>
+    alert_sent : Boolean
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Intervention_Metrologique {
+    _id : ObjectId
+    --
+    equipement_id : ObjectId <<FK Equipement_Mesure>>
+    type_intervention : Enum[etalonnage, verification]
+    date_intervention : Date
+    date_echeance_prochaine : Date <<auto computed>>
+    resultat : Enum[conforme, nonConforme]
+    organisme_id : ObjectId <<FK Organisme_Metrologie>>
+    cout : Number
+    certificat_url : ObjectId <<FK DocumentFile>>
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class RR_Analyse {
+    _id : ObjectId
+    --
+    equipement_id : ObjectId <<FK Equipement_Mesure>>
+    nb_operateurs : Number
+    nb_pieces : Number
+    valeurs_mesures : Mixed
+    pourcentage_rr : Number <<auto computed>>
+    resultat_statistique : String
+    alerte_envoye : Boolean
+    createdAt : Date
+  }
+
+}
+
+' RELATIONSHIPS
+Client "1" -- "*" Reclamation_Client : soumet
+Client "1" -- "*" Enquete : sonde par
+Client "*" -- "1" Client_Categorie
+Client "*" -- "1" Client_Region
+Enquete "1" -- "1" Questionnaire_Template
+Enquete "1" -- "*" ReponseEmbed
+Questionnaire_Template "1" -- "*" Question
+Reclamation_Client "1" -- "0..1" Action : declenche
+
+Fournisseur "*" -- "1" Fournisseur_Categorie
+Fournisseur "1" -- "*" Evaluation_Fournisseur : evalue par
+Evaluation_Fournisseur "1" -- "*" NoteCritereEmbed
+Fournisseur "1" -- "*" Reclamation_Fournisseur : recoit
+Reclamation_Fournisseur "1" -- "0..1" Action : declenche
+
+SmartRelease "1" -- "*" ControlEmbed : controles
+SmartRelease "*" -- "1" Processus : appartient a
+SmartRelease "1" -- "0..1" NC : declenche
+
+Equipement_Mesure "1" -- "*" Intervention_Metrologique : subit
+Equipement_Mesure "1" -- "*" RR_Analyse : analyse par
+Equipement_Mesure "*" -- "1" Machine : monte sur
+Intervention_Metrologique "*" -- "1" Organisme_Metrologie : realisee par
+Intervention_Metrologique "1" -- "0..1" Action : declenche
+
+@enduml
