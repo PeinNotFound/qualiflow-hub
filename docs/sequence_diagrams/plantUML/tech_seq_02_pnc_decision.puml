@@ -1,0 +1,49 @@
+@startuml TECH-SEQ-02-PNC-Decisions
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+skinparam ParticipantBackgroundColor #FDEDEC
+skinparam ParticipantBorderColor #E74C3C
+
+title Qualibot-Hub — Séquence Technique : Circuit Décision PNC (MERN)
+
+actor "Décideur" as User
+participant "React Frontend" as Client <<React>>
+participant "api.ts" as Api <<Axios>>
+participant "PNCRoutes\n(/api/v1/pncs)" as Router <<Express>>
+participant "AuthMiddleware" as Auth <<Middleware>>
+participant "PNCController" as Ctrl <<Controller>>
+participant "NotificationService" as NotifSvc <<Service>>
+database "MongoDB" as DB <<Mongoose>>
+
+== Création Décision (Rebut Coûteux) ==
+User -> Client : Sélectionne "Rebut", saisit détails
+Client -> Api : PUT /api/v1/pncs/:id/decision\n{ type: 'rebut', val_rejet: 50000 }
+Api -> Router : HTTP PUT (JWT token)
+Router -> Auth : verifyToken(req, res, next)
+Auth --> Router : next()
+Router -> Ctrl : updateDecision(req, res)
+
+== Vérification Logique & Validation ==
+Ctrl -> DB : pnc = await PNC_Fiche.findById(id)
+DB --> Ctrl : pncDoc
+Ctrl -> Ctrl : Analyse type & montant
+
+opt Si ValidationRequise (val_rejet > Seuil)
+  Ctrl -> Ctrl : pncDoc.traitement.status = 'enAttente'
+  Ctrl -> Ctrl : générer ValidationStepEmbed (Validateur_ID = N+1)
+  Ctrl -> DB : await pncDoc.save()
+  
+  Ctrl -> NotifSvc : envoyerAlerte(validateur_id, "Validation Requise PNC " + pncDoc.reference)
+  NotifSvc -> DB : Notification.create(...)
+  
+  Ctrl --> Api : HTTP 200 OK { message: "Validation N+1 requise", pnc: pncDoc }
+  Api --> Client : HTTP 200
+  Client -> User : Toast "Envoyé pour validation"
+else Si direct
+  Ctrl -> Ctrl : pncDoc.traitement.status = 'enCours'
+  Ctrl -> DB : await pncDoc.save()
+  Ctrl --> Api : HTTP 200 OK { message: "Décision enregistrée", pnc: pncDoc }
+end
+
+@enduml

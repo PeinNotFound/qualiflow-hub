@@ -1,0 +1,108 @@
+@startuml TECH-SEQ-04-Action-Full
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #E8F8F5
+skinparam ParticipantBorderColor #1ABC9C
+
+title Qualibot-Hub — Séquence Technique Détaillée : Workflow Action (MERN)
+
+actor "Utilisateur\n(Demandeur)" as User
+participant "React\nFront-End\n(ActionForm.tsx)" as Client
+participant "api.ts\n(Axios Interceptor)" as Api
+participant "Express Router\n(/api/v1/actions)" as Router
+participant "Auth & Role\nMiddlewares" as Middleware
+participant "ActionController" as Ctrl
+participant "WorkflowService" as Service
+database "MongoDB\n(Action, ActionLog, UserModel)" as DB
+
+== Phase A : Demande & Enregistrement ==
+User -> Client : Renseigne Description, Source, Pilote, etc.
+Client -> Client : Validation Zod (Vérification des champs)
+Client -> Api : POST /api/v1/actions
+Api -> Api : Ajout Header (Bearer JWT)
+Api -> Router : HTTP POST
+Router -> Middleware : verifyToken() & checkRole(['admin', 'pilot', 'operator'])
+Middleware --> Router : next()
+Router -> Ctrl : createAction(req, res)
+
+Ctrl -> DB : User.findById(req.user.id).populate('site_id')
+DB --> Ctrl : userDoc (avec détails du site)
+
+Ctrl -> Service : buildValidationCircuit(req.body.source_module, userDoc.site_id)
+Service -> DB : Requête pour trouver le Responsable du Processus & Site
+DB --> Service : validateur_id
+Service --> Ctrl : circuit_validation = [{ ordre: 1, validateur_id, statut: 'enAttente' }]
+
+Ctrl -> DB : Action.create({ ...req.body, circuit_validation, statut: 'enAttente' })
+DB --> Ctrl : actionDoc
+
+Ctrl -> DB : ActionLog.create({ action_id, user_id, action: 'CREATION', timestamp })
+DB --> Ctrl : logDoc
+
+Ctrl --> Api : HTTP 201 Created { data: actionDoc }
+Api --> Client : 201 Success
+Client -> User : Notification Toast: "Action soumise pour validation"
+
+== Phase B : Validation & Assignation IA ==
+actor "Validateur" as Val
+Val -> Client : Clique sur "Valider Action"
+Client -> Api : PATCH /api/v1/actions/:id/validate
+Api -> Router : HTTP PATCH
+Router -> Ctrl : validateAction(req, res)
+
+Ctrl -> DB : findOneAndUpdate({ _id: id, 'circuit_validation.validateur_id': req.user.id },\n{ $set: {'circuit_validation.$.statut': 'approuve'} })
+DB --> Ctrl : actionDoc (updated)
+
+Ctrl -> Ctrl : Vérifier si toutes les étapes de validation sont 'approuve'
+alt Validation Complète
+    Ctrl -> DB : Update actionDoc.statut = 'enCours', validation_finale = true
+    
+    note over Ctrl, DB: [Integration IA - Optionnelle future]\nLe système pourrait interroger l'Axe 4\npour prédire l'Efficacité.
+    
+    Ctrl -> Service : generateSubActionsAlerts(actionDoc.sous_actions)
+    Service -> DB : Update Notification collections pour les Responsables de Réalisation
+end
+
+Ctrl --> Api : HTTP 200 OK
+Api --> Client : Mise à jour de l'UI
+Client -> Val : "Action validée et transmise aux réalisateurs"
+
+== Phase C : Réalisation (Sous-Action) ==
+actor "Responsable\nRéalisation" as Real
+Real -> Client : Saisit Taux_Realisation (ex: 100%)
+Client -> Api : PUT /api/v1/actions/:id/sous-actions/:subId
+Api -> Router : HTTP PUT
+Router -> Ctrl : updateSubAction(req, res)
+
+Ctrl -> DB : Action.findOneAndUpdate({ 'sous_actions._id': subId },\n{ $set: { 'sous_actions.$.taux_realisation': 100, 'sous_actions.$.statut': 'realise' }})
+DB --> Ctrl : updatedActionDoc
+
+Ctrl -> DB : ActionLog.create({ champ_modifie: "Taux_Realisation", motif: req.body.motif })
+
+Ctrl -> Ctrl : recalculer Taux_Avancement Global\n(Sum(taux_realisation) / count(sous_actions))
+Ctrl -> DB : updatedActionDoc.taux_avancement = X; save()
+
+Ctrl --> Api : HTTP 200 OK
+Api --> Client : UI Refresh
+
+== Phase D : Suivi, Évaluation & Clôture ==
+actor "Responsable\nSite / Clôture" as Cloture
+Cloture -> Client : Evalue efficacité (Efficace/Non Efficace) et clôture
+Client -> Api : PATCH /api/v1/actions/:id/close
+Api -> Router : HTTP PATCH
+Router -> Ctrl : closeAction(req, res)
+
+Ctrl -> DB : Action.findById(req.params.id)
+DB --> Ctrl : actionDoc
+alt Action Efficace == false
+    Ctrl -> Ctrl : throw Error("Action ne peut pas être clôturée si Efficacité non validée")
+else Efficace == true
+    Ctrl -> DB : Update statut = 'cloturee', closedAt = NOW
+    Ctrl -> DB : ActionLog.create(...)
+    Ctrl --> Api : HTTP 200 OK { actionCloturee }
+end
+
+Client -> Cloture : "Action clôturée avec succès"
+
+@enduml

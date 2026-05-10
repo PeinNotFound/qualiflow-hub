@@ -1,0 +1,43 @@
+@startuml UC-02-PNC
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+
+title Qualibot-Hub — Use Cases : Module Produits Non Conformes (PNC)
+
+actor "Détecteur\n(Opérateur/Client)" as Detecteur
+actor "Décideur" as Decideur
+actor "Validateur" as Validateur
+actor "Responsable de\nTraitement" as Traitement
+actor "Responsable de\nSuivi" as Suivi
+
+rectangle "Module PNC" {
+  usecase "Enregistrer une PNC" as UC_Declare
+  usecase "Lier à une Réclamation (Client/Fournisseur)" as UC_Lier
+  usecase "Saisir la Décision de Traitement\n(Rebut, Retouche...)" as UC_Decision
+  usecase "Valider une Décision Critique" as UC_Validation
+  usecase "Saisir les Quantités et Coûts" as UC_Traitement
+  usecase "Évaluer l'efficacité et Clôturer" as UC_Cloture
+}
+
+Detecteur --> UC_Declare
+UC_Declare .> UC_Lier : <<extend>>
+
+Decideur --> UC_Decision
+UC_Decision .> UC_Validation : <<extend>> (si rebut coûteux)
+Validateur --> UC_Validation
+
+Traitement --> UC_Traitement
+Suivi --> UC_Cloture
+
+package "Modules Externes" {
+  usecase "Créer Action Corrective" as UC_Action
+  usecase "Envoi Alerte Workflow" as UC_Alerte
+}
+
+UC_Cloture .> UC_Action : <<include>> (si nécessaire)
+UC_Declare .> UC_Alerte : <<include>>
+UC_Decision .> UC_Alerte : <<include>>
+UC_Traitement .> UC_Alerte : <<include>>
+
+@enduml

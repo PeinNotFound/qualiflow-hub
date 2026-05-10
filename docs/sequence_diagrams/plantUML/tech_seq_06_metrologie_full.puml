@@ -1,0 +1,68 @@
+@startuml TECH-SEQ-06-Metrologie-Full
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #FDEBD0
+skinparam ParticipantBorderColor #E67E22
+
+title Qualibot-Hub — Séquence Technique Détaillée : Workflow Métrologie & R&R (MERN)
+
+actor "Resp. Métrologie" as User
+participant "React\nFront-End" as Client
+participant "api.ts\n(Axios)" as Api
+participant "Express Router\n(/api/v1/metrologie)" as Router
+participant "AuthMiddleware" as Auth
+participant "MetrologieController" as Ctrl
+participant "RRCertificationService" as Service
+database "MongoDB\n(Equipement, Intervention)" as DB
+
+== Phase A : Enregistrement d'une Intervention ==
+User -> Client : Saisit le rapport d'étalonnage (Résultat, Échéance Prochaine)
+Client -> Api : POST /api/v1/metrologie/equipements/:id/interventions
+Api -> Router : HTTP POST
+Router -> Auth : verifyToken(req)
+Auth --> Router : next()
+Router -> Ctrl : registerIntervention(req, res)
+
+Ctrl -> DB : Equipement_Mesure.findById(id)
+DB --> Ctrl : equipDoc
+
+Ctrl -> DB : Intervention_Metrologique.create({ equipement_id, resultat, ... })
+DB --> Ctrl : intervDoc
+
+alt if resultat == 'nonConforme'
+    Ctrl -> Service : suspendEquipment(id)
+    Service -> DB : Equipement.updateOne({ _id: id }, { etat: 'horsService' })
+    
+    note over Ctrl, Service : Déclenche l'Action Corrective
+    Service -> DB : Action.create({ source_module: 'metrologie', source_id: intervDoc._id })
+    DB --> Service : actionDoc
+    
+    Ctrl -> Service : notifyProcessusUsers(equipDoc.processus_id)
+end
+
+Ctrl -> DB : equipDoc.date_echeance_prochaine = req.body.echeance; equipDoc.save()
+Ctrl --> Api : HTTP 201 Created { intervention: intervDoc }
+Api --> Client : UI Refresh (Equipement marqué Hors Service)
+
+== Phase B : Analyse GR&R (Gage R&R) ==
+User -> Client : Téléverse matrice de mesures R&R (Opérateurs x Pièces)
+Client -> Api : POST /api/v1/metrologie/equipements/:id/rr-analysis
+Api -> Router : HTTP POST
+Router -> Ctrl : performRRAnalysis(req, res)
+
+Ctrl -> DB : Equipement_Mesure.findById(id)
+DB --> Ctrl : equipDoc
+
+Ctrl -> Service : calculateGRR(req.body.valeurs_mesures)
+note over Service : L'Algo analyse la Répétabilité (EV) \net la Reproductibilité (AV)
+Service -> Service : Standard Deviation Math()
+Service --> Ctrl : { pourcentage_rr: 22.5, status: 'Acceptable' }
+
+Ctrl -> DB : RR_Analyse.create({ equipement_id: id, valeurs_mesures, pourcentage_rr: 22.5, resultat_statistique: 'Acceptable' })
+DB --> Ctrl : rrDoc
+
+Ctrl --> Api : HTTP 200 OK { rr_analyse: rrDoc }
+Api --> Client : Affiche le Graphique d'Écart GR&R
+
+@enduml

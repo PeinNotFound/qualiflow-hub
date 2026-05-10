@@ -1,0 +1,1337 @@
+@startuml Qualibot-Hub MongoDB Schema v2
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam packageFontSize 12
+skinparam ArrowColor #444444
+skinparam ClassBorderColor #2c3e50
+skinparam ClassBackgroundColor #ecf0f1
+skinparam PackageBorderColor #2980B9
+skinparam PackageBackgroundColor #EBF5FB
+skinparam NoteBackgroundColor #FFFFF0
+skinparam NoteBorderColor #AAAAAA
+
+title Qualibot-Hub — MongoDB Full Schema v2.0\n(MERN Stack — No AI Features)
+
+' ============================================================
+' PACKAGE: IDENTITY & SECURITY
+' ============================================================
+package "01 · Identity & Security" #EBF5FB {
+
+  class User {
+    _id : ObjectId
+    --
+    name : String
+    email : String
+    passwordHash : String
+    role : Enum[admin, pilot, auditor, operator]
+    employee_id : ObjectId <<FK Employee>>
+    processus_id : ObjectId <<FK Processus>>
+    site_id : ObjectId <<FK Site>>
+    isActive : Boolean
+    lastLogin : Date
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Site {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+    adresse : String
+    responsables_validation : ObjectId[] <<FK Employee>>
+  }
+
+  class Direction {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+  }
+
+  class Metier {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+  }
+
+}
+
+' ============================================================
+' PACKAGE: CORE REFERENCE DATA
+' ============================================================
+package "02 · Core Reference" #EEF8EE {
+
+  class Processus {
+    _id : ObjectId
+    --
+    code : String
+    name : String
+    type : Enum[management, realisation, support]
+    pilote_id : ObjectId <<FK Employee>>
+    objectifs : String[]
+    entrees : String[]
+    sorties : String[]
+    periodicite_revue : Number <<months>>
+    isPublished : Boolean
+    createdAt : Date
+  }
+
+  note right of Processus
+    Les 12 Processus MSL :
+    1. Pilotage SMQ
+    2. Amélioration Continue
+    3. Commercial
+    4. Exploitation
+    5. Magasin
+    6. Transport
+    7. Achat
+    8. GRH
+    9. Informatique
+    10. Facturation
+    11. Moyens Généraux
+    12. Recouvrement
+  end note
+
+}
+
+' ============================================================
+' PACKAGE: GRH
+' ============================================================
+package "03 · GRH" #FEF9E7 {
+
+  class Employee {
+    _id : ObjectId
+    --
+    matricule : String
+    nom : String
+    prenom : String
+    email : String
+    poste_actuel : String
+    date_entree : Date
+    typeContrat : Enum[CDI, CDD, stagiaire]
+    ' --- Reference FKs ---
+    processus_id : ObjectId <<FK Processus>>
+    site_id : ObjectId <<FK Site>>
+    direction_id : ObjectId <<FK Direction>>
+    metier_id : ObjectId <<FK Metier>>
+    fonction_id : ObjectId <<FK Fonction>>
+    ' --- Access Flags ---
+    is_Superviseur : Boolean
+    is_Auditeur_Interne : Boolean
+    is_Actif : Boolean
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Fonction {
+    _id : ObjectId
+    --
+    designation : String
+    code_doc_fiche_poste : ObjectId <<FK DocumentFile>>
+    qualifications_requises : QualifRequiseEmbed[]
+    createdAt : Date
+  }
+
+  class QualifRequiseEmbed <<embed>> {
+    qualification_id : ObjectId <<FK Qualification>>
+    niveau_requis : Number <<1-5>>
+  }
+
+  class Qualification {
+    _id : ObjectId
+    --
+    designation : String
+    type : Enum[informatique, technique, reglementaire, manageriale]
+    is_periodique : Boolean
+    frequence_mois : Number
+    responsable_id : ObjectId <<FK Employee>>
+    coefficient_ponderation : Number
+  }
+
+  class Habilitation {
+    _id : ObjectId
+    --
+    employee_id : ObjectId <<FK Employee>>
+    qualification_id : ObjectId <<FK Qualification>>
+    dateObtention : Date
+    dateExpiration : Date
+    status : Enum[valide, expire, enCours]
+    alertSent : Boolean
+    certificat_id : ObjectId <<FK DocumentFile>>
+  }
+
+  class Formation {
+    _id : ObjectId
+    --
+    theme : String
+    organisme : String
+    type : Enum[interne, externe]
+    date_prevue : Date
+    date_realisee : Date
+    cout : Number
+    statut : Enum[planifie, realise, annule]
+    ' --- Évaluation ---
+    score_chaud : ScoreChaudEmbed
+    score_froid : ScoreFroidEmbed
+    qualifications_validees : ObjectId[] <<FK Qualification>>
+    employee_ids : ObjectId[] <<FK Employee>>
+    createdAt : Date
+  }
+
+  class ScoreChaudEmbed <<embed>> {
+    note_contenu : Number <<0-5>>
+    note_animateur : Number <<0-5>>
+    note_organisation : Number <<0-5>>
+    commentaire : String
+  }
+
+  class ScoreFroidEmbed <<embed>> {
+    evaluateur_id : ObjectId <<FK Employee>>
+    taux_efficacite : Number <<0-100>>
+    qualifications_validees : Boolean
+    commentaire : String
+    date_evaluation : Date
+  }
+
+  class Formation_Demande {
+    _id : ObjectId
+    --
+    demandeur_id : ObjectId <<FK Employee>>
+    theme : String
+    justification : String
+    date_souhaitee : Date
+    statut : Enum[enAttente, approuve, rejete]
+    circuit_validation : ValidationStepEmbed[]
+    formation_id : ObjectId <<FK Formation>>
+    createdAt : Date
+  }
+
+  class ValidationStepEmbed <<embed>> {
+    ordre : Number
+    validateur_id : ObjectId <<FK Employee>>
+    statut : Enum[enAttente, approuve, rejete]
+    commentaire : String
+    date_decision : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: DOCUMENTATION (5 Axes)
+' ============================================================
+package "04 · Documentation — 5 Axes" #F4ECF7 {
+
+  class DocumentationAxe {
+    _id : ObjectId
+    --
+    processus_id : ObjectId <<FK Processus>>
+    axe_number : Enum[1, 2, 3, 4, 5]
+    axe_label : String
+    content : Mixed
+    updatedAt : Date
+    updatedBy : ObjectId <<FK User>>
+  }
+
+  note right of DocumentationAxe
+    Axe 1 : Fiche d'Identité & Gouvernance
+    Axe 2 : Cartographie du Processus
+    Axe 3 : Procédures & Instructions
+    Axe 4 : KPIs (widget depuis Module 06)
+    Axe 5 : Enregistrements & Preuves
+  end note
+
+  class DocumentFile {
+    _id : ObjectId
+    --
+    code : String <<auto-generated>>
+    libelle : String
+    type : Enum[procedure, manuel, instruction, formulaire, enregistrement, externe]
+    version : String <<A, B, C...>>
+    statut : Enum[enRedaction, enVerification, enVigueur, perime]
+    fileUrl : String
+    mimeType : String
+    site_id : ObjectId <<FK Site>>
+    activite : String
+    motif_maj : String
+    date_mise_en_vigueur : Date
+    lastReviewedAt : Date
+    reviewDueDate : Date <<+12 months>>
+    isConfidentiel : Boolean
+    axe_id : ObjectId <<FK DocumentationAxe>>
+    ' --- Acteurs RACI ---
+    superviseur_id : ObjectId <<FK User>>
+    redacteurs : ObjectId[] <<FK User>>
+    verificateurs : ObjectId[] <<FK User>>
+    approbateurs : ObjectId[] <<FK User>>
+    ' --- Renvois ---
+    documents_renvoi : ObjectId[] <<FK DocumentFile>>
+    ' --- Logs ---
+    modificationLogs : ModifLogEmbed[]
+    createdAt : Date
+  }
+
+  class ModifLogEmbed <<embed>> {
+    user_id : ObjectId <<FK User>>
+    action : String
+    motif : String
+    timestamp : Date
+  }
+
+  class DocumentExterne {
+    _id : ObjectId
+    --
+    reference : String
+    libelle : String
+    source : String <<client, fournisseur, organisme>>
+    fileUrl : String
+    date_reception : Date
+    processus_ids : ObjectId[] <<FK Processus>>
+    axe_id : ObjectId <<FK DocumentationAxe>>
+    createdAt : Date
+  }
+
+  class ListeDiffusion {
+    _id : ObjectId
+    --
+    document_id : ObjectId <<FK DocumentFile>>
+    destinataires : ObjectId[] <<FK Employee>>
+    date_diffusion : Date
+    mode : Enum[electronique, papier]
+    accuses_reception : AccuseEmbed[]
+  }
+
+  class AccuseEmbed <<embed>> {
+    employee_id : ObjectId <<FK Employee>>
+    date_lecture : Date
+    isConfirmed : Boolean
+  }
+
+}
+
+' ============================================================
+' PACKAGE: INDICATEURS / KPI
+' ============================================================
+package "06 · Indicateurs" #FDEBD0 {
+
+  class Indicateur_Type {
+    _id : ObjectId
+    --
+    designation : String
+    processus_id : ObjectId <<FK Processus>>
+    liste_acces : ObjectId[] <<FK Employee>>
+  }
+
+  class Axe_Politique {
+    _id : ObjectId
+    --
+    code_axe : String
+    libelle : String <<Satisfaction Client, Excellence Op...>>
+  }
+
+  class Indicateur {
+    _id : ObjectId
+    --
+    libelle : String
+    processus_id : ObjectId <<FK Processus>>
+    type_id : ObjectId <<FK Indicateur_Type>>
+    axe_id : ObjectId <<FK Axe_Politique>>
+    periodicite : Enum[mensuel, trimestriel, semestriel, annuel]
+    type_suivi : Enum[manuel, formule, import]
+    type_resultat : Enum[moyenne, cumul, ponderee, dernier, ouiNon]
+    formule : String
+    unite : String
+    responsable_id : ObjectId <<FK Employee>>
+    isActive : Boolean
+    createdAt : Date
+  }
+
+  class Indicateur_Valeur {
+    _id : ObjectId
+    --
+    indicateur_id : ObjectId <<FK Indicateur>>
+    date_periode : String <<YYYY-MM>>
+    valeur_saisie : Number
+    valeur_ponderee : Number
+    commentaire : String
+    saisi_par : ObjectId <<FK User>>
+    createdAt : Date
+  }
+
+  class Historique_Cible {
+    _id : ObjectId
+    --
+    indicateur_id : ObjectId <<FK Indicateur>>
+    valeur_cible : Number
+    seuil_nc : Number
+    date_application : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: RISQUES / AMDEC
+' ============================================================
+package "07 · Risques / AMDEC" #FDEDEC {
+
+  class Risque_Domaine {
+    _id : ObjectId
+    --
+    designation : String
+    type : Enum[menace, opportunite]
+    seuil_criticite_acceptable : Number
+  }
+
+  class Critere_Evaluation_Risque {
+    _id : ObjectId
+    --
+    libelle : String <<Gravité, Occurrence, Détectabilité>>
+    domaine_id : ObjectId <<FK Risque_Domaine>>
+    notes : Note_Critere_Embed[]
+  }
+
+  class Note_Critere_Embed <<embed>> {
+    valeur_numerique : Number
+    signification_texte : String
+  }
+
+  class Calcul_Methode {
+    _id : ObjectId
+    --
+    libelle : String
+    formule_texte : String <<e.g. G * O * D>>
+  }
+
+  class Risque_Fiche {
+    _id : ObjectId
+    --
+    processus_id : ObjectId <<FK Processus>>
+    domaine_id : ObjectId <<FK Risque_Domaine>>
+    methode_id : ObjectId <<FK Calcul_Methode>>
+    date : Date
+    objet_incertitude : String
+    cause : String
+    evenement : String
+    enjeu : String
+    statut : Enum[initial, residuel]
+    scores_initiaux : ScoreRisqueEmbed
+    scores_residuels : ScoreRisqueEmbed
+    actions : ObjectId[] <<FK Action>>
+    participants : ObjectId[] <<FK Employee>>
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class ScoreRisqueEmbed <<embed>> {
+    critere_notes : CritereNoteEmbed[]
+    score_brut : Number <<auto-computed>>
+  }
+
+  class CritereNoteEmbed <<embed>> {
+    critere_id : ObjectId <<FK Critere_Evaluation_Risque>>
+    note_id : Number
+  }
+
+}
+
+' ============================================================
+' PACKAGE: NON-CONFORMITES & PNC
+' ============================================================
+package "08 · Non-Conformités & PNC" #FDEDEC {
+
+  class NC {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    titre : String
+    description : String
+    source_module : Enum[audit, client, fournisseur, smartrelease, metrologie, veille, pilotage, reclamationClient]
+    source_id : ObjectId
+    processus_id : ObjectId <<FK Processus>>
+    severity : Enum[mineure, majeure, critique]
+    type_nc : Enum[documentaire, operationnelle, systemique]
+    status : Enum[ouverte, enCours, cloturee]
+    detecte_par : ObjectId <<FK User>>
+    constat_at : Date
+    echeance : Date
+    actions : ObjectId[] <<FK Action>>
+    audit_flash_declenche : Boolean
+    closed_at : Date
+    createdAt : Date
+  }
+
+  ' --- PNC (Produits Non Conformes) ---
+  class Produit {
+    _id : ObjectId
+    --
+    code : String
+    designation : String
+    prix_unitaire : Number
+    personnes_a_informer : ObjectId[] <<FK Employee>>
+    processus_id : ObjectId <<FK Processus>>
+  }
+
+  class PNC_Parametre {
+    _id : ObjectId
+    --
+    type_nc : String
+    source_nc : String
+    gravite : String
+    atelier : String
+  }
+
+  class PNC_Fiche {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    date_detection : Date
+    date_livraison : Date
+    atelier : String
+    lieu_detection : Enum[interne, client]
+    processus_id : ObjectId <<FK Processus>>
+    reclamation_fournisseur_id : ObjectId <<FK Reclamation_Fournisseur>>
+    reclamation_client_id : ObjectId <<FK Reclamation_Client>>
+    details : PNC_Detail[]
+    traitement : Traitement_PNC
+    nc_id : ObjectId <<FK NC>>
+    actions : ObjectId[] <<FK Action>>
+    createdAt : Date
+  }
+
+  class PNC_Detail <<embed>> {
+    produit_id : ObjectId <<FK Produit>>
+    type_nc_id : String <<FK PNC_Parametre>>
+    num_of : String
+    num_lot : String
+    qte_detectee : Number
+    qte_produite : Number
+  }
+
+  class Traitement_PNC <<embed>> {
+    type_traitement : Enum[retouche, rebut, derogation, acceptation]
+    decideur_id : ObjectId <<FK Employee>>
+    responsable_traitement_id : ObjectId <<FK Employee>>
+    responsable_suivi_id : ObjectId <<FK Employee>>
+    circuit_validation : ValidationStepEmbed[]
+    delai : Date
+    qte_rejetee : Number
+    valeur_rejet : Number
+    qte_declassee : Number
+    qte_acceptee : Number
+    cout_total : Number
+    status : Enum[enAttente, enCours, cloture]
+    closed_at : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: PLAN D'ACTIONS
+' ============================================================
+package "09 · Plan d'Actions" #E8F8F5 {
+
+  class Action_Parametre {
+    _id : ObjectId
+    --
+    type_action : Enum[corrective, preventive, amelioration]
+    source_action : Enum[audit, reclamationClient, nc, pnc, risque, reunion, indicateur, revueDirection, revueProcessus, metrologie, veille]
+    cause_type : Enum[humaine, materielle, methode, milieu, management]
+    priorite_libelle : String
+    priorite_poids : Number
+    gravite_libelle : String
+    gravite_poids : Number
+  }
+
+  class Action {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    designation : String
+    description_probleme : String
+    source_module : String <<FK Action_Parametre.source_action>>
+    source_id : ObjectId
+    processus_id : ObjectId <<FK Processus>>
+    type_id : ObjectId <<FK Action_Parametre>>
+    direction_pilote_id : ObjectId <<FK Direction>>
+    metier_id : ObjectId <<FK Metier>>
+    theme_id : String
+    statut : Enum[enAttente, validee, refusee, enCours, cloturee]
+    cause_racine : String
+    methode_cause : Enum[5pourquoi, ishikawa]
+    responsable_cloture_id : ObjectId <<FK Employee>>
+    validation_finale : Boolean
+    circuit_validation : ValidationStepEmbed[]
+    sous_actions : ObjectId[] <<FK Sous_Action>>
+    taux_avancement : Number <<0-100, auto-computed>>
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Sous_Action {
+    _id : ObjectId
+    --
+    action_id : ObjectId <<FK Action>>
+    designation : String
+    date_echeance : Date
+    taux_realisation : Number <<0-100>>
+    taux_efficacite : Number <<0-100>>
+    commentaires : String
+    depenses : Number
+    responsable_realisation_id : ObjectId <<FK Employee>>
+    responsable_suivi_id : ObjectId <<FK Employee>>
+    preuves : ObjectId[] <<FK DocumentFile>>
+    statut : Enum[enAttente, enCours, realise, enRetard]
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Action_Log {
+    _id : ObjectId
+    --
+    action_id : ObjectId <<FK Action>>
+    user_id : ObjectId <<FK User>>
+    champ_modifie : String
+    ancienne_valeur : String
+    nouvelle_valeur : String
+    motif : String <<obligatoire>>
+    timestamp : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: AUDITS
+' ============================================================
+package "10 · Audits" #EBF5FB {
+
+  class Audit_Parametre {
+    _id : ObjectId
+    --
+    ' --- Champ d'audit ---
+    champ_nom : String <<ex: Stockage, Transport>>
+    champ_criticite : Enum[faible, moyen, critique]
+    champ_acces : ObjectId[] <<FK User>>
+    ' --- Type d'audit ---
+    type_audit : Enum[interne, externe, flash]
+    auditeurs_qualifies : ObjectId[] <<FK Employee>>
+    circuit_validation_ids : ObjectId[] <<FK Employee>>
+    ' --- Paramétrage écarts ---
+    ecart_types : EcartTypeEmbed[]
+    gravites : GraviteEmbed[]
+  }
+
+  class EcartTypeEmbed <<embed>> {
+    libelle : String
+  }
+
+  class GraviteEmbed <<embed>> {
+    libelle : String <<Mineur, Majeur>>
+    index_ordre : Number
+  }
+
+  class Audit {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    parametre_id : ObjectId <<FK Audit_Parametre>>
+    processus_id : ObjectId <<FK Processus>>
+    type : Enum[interne, externe, flash]
+    date_debut_prev : Date
+    date_fin_prev : Date
+    date_realisation : Date
+    etat : Enum[nonRealise, realise, valide]
+    auditeurs : ObjectId[] <<FK Employee isAuditeur_Interne=true>>
+    audites : ObjectId[] <<FK Employee>>
+    documents_associes : ObjectId[] <<FK DocumentFile>>
+    plan_activites : Plan_Audit_Activite[]
+    checklist : ChecklistItemEmbed[]
+    points_forts : String[]
+    ecarts : ObjectId[] <<FK Constat_Ecart>>
+    nc_ids : ObjectId[] <<FK NC>>
+    rapport_url : String
+    validateur_id : ObjectId <<FK Employee>>
+    createdAt : Date
+  }
+
+  class Plan_Audit_Activite <<embed>> {
+    heure_debut : String
+    heure_fin : String
+    lieu : String
+    objectif : String
+    personnes_a_rencontrer : ObjectId[] <<FK Employee>>
+  }
+
+  class ChecklistItemEmbed <<embed>> {
+    chapitre_iso : String <<e.g. 8.4.1>>
+    exigence : String
+    reponse : Enum[conforme, nonConforme, nonApplicable]
+    commentaire : String
+  }
+
+  class Constat_Ecart {
+    _id : ObjectId
+    --
+    audit_id : ObjectId <<FK Audit>>
+    type_ecart_id : String <<FK EcartTypeEmbed>>
+    gravite_id : String <<FK GraviteEmbed>>
+    description : String
+    audite_concerne_id : ObjectId <<FK Employee>>
+    chapitre_iso : String
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class ChecklistISO {
+    _id : ObjectId
+    --
+    chapitre : String
+    sous_chapitre : String
+    exigence : String
+    processus_ids : ObjectId[] <<FK Processus>>
+  }
+
+}
+
+' ============================================================
+' PACKAGE: CLIENTS & PARTIES INTERESSEES
+' ============================================================
+package "11 · Clients & Parties Intéressées" #FEF9E7 {
+
+  class Client_Categorie {
+    _id : ObjectId
+    --
+    designation : String
+  }
+
+  class Client_Region {
+    _id : ObjectId
+    --
+    designation : String
+  }
+
+  class Client {
+    _id : ObjectId
+    --
+    code : String
+    raison_sociale : String
+    email_contact : String
+    telephone : String
+    region_id : ObjectId <<FK Client_Region>>
+    categorie_id : ObjectId <<FK Client_Categorie>>
+    type_id : String
+    createdAt : Date
+  }
+
+  class Reclamation_Client {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    date_rec : Date
+    client_id : ObjectId <<FK Client>>
+    type_rec_id : String
+    gravite_id : String
+    site_id : ObjectId <<FK Site>>
+    description : String
+    with_return : Boolean <<triggers PNC alert>>
+    pnc_id : ObjectId <<FK PNC_Fiche>>
+    ' --- Workflow ---
+    decideur_id : ObjectId <<FK Employee>>
+    responsable_traitement_id : ObjectId <<FK Employee>>
+    responsable_suivi_id : ObjectId <<FK Employee>>
+    statut : Enum[saisie, decision, traitement, cloture]
+    ' --- Finances ---
+    cout_penalite : Number
+    autres_frais : Number
+    rapport_traitement : String
+    action_id : ObjectId <<FK Action>>
+    closed_at : Date
+    createdAt : Date
+  }
+
+  class Questionnaire_Template {
+    _id : ObjectId
+    --
+    titre : String
+    texte_intro : String
+    texte_fin : String
+    questions : ObjectId[] <<FK Question>>
+    createdAt : Date
+  }
+
+  class Question {
+    _id : ObjectId
+    --
+    questionnaire_id : ObjectId <<FK Questionnaire_Template>>
+    libelle : String
+    variable_id : String
+    type_question : Enum[choixMultiple, matriceSimple, matriceDouble, numerique, ouverte]
+    est_obligatoire : Boolean
+    est_unique : Boolean
+    limite_min : Number
+    limite_max : Number
+    options : String[]
+  }
+
+  class Enquete {
+    _id : ObjectId
+    --
+    reference : String <<auto>>
+    questionnaire_id : ObjectId <<FK Questionnaire_Template>>
+    date_debut : Date
+    date_fin : Date
+    mode : Enum[client, anonyme]
+    clients : ObjectId[] <<FK Client>>
+    lien_public : String
+    reponses : ReponseEmbed[]
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class ReponseEmbed <<embed>> {
+    client_id : ObjectId <<FK Client>>
+    date_reponse : Date
+    answers : AnswerEmbed[]
+  }
+
+  class AnswerEmbed <<embed>> {
+    question_id : ObjectId <<FK Question>>
+    valeur : Mixed
+  }
+
+  class PartieInteressee {
+    _id : ObjectId
+    --
+    nom : String
+    type : Enum[interne, externe, tutelle, opinionPublique]
+    exigences : String[]
+    actions_associees : String[]
+    canal_communication : String
+    responsable_id : ObjectId <<FK User>>
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: FOURNISSEURS
+' ============================================================
+package "12 · Fournisseurs" #F4ECF7 {
+
+  class Fournisseur_Categorie {
+    _id : ObjectId
+    --
+    code : String
+    designation : String <<Local, Etranger, Prestataire>>
+  }
+
+  class Type_Produit {
+    _id : ObjectId
+    --
+    designation : String
+    periodicite_evaluation : Number <<months>>
+  }
+
+  class Critere_Eval_Fournisseur {
+    _id : ObjectId
+    --
+    libelle : String
+    coefficient : Number <<weight 0-100>>
+    responsable_id : ObjectId <<FK Employee>>
+    type_produit_id : ObjectId <<FK Type_Produit>>
+  }
+
+  class Fournisseur {
+    _id : ObjectId
+    --
+    code : String
+    raison_sociale : String
+    contact : String
+    email : String
+    telephone : String
+    categorie_id : ObjectId <<FK Fournisseur_Categorie>>
+    produits_agrees : ProduitAgreeEmbed[]
+    contrat_expiry : Date
+    status : Enum[actif, asSurveiller, suspendu, inactif]
+    certifications : ObjectId[] <<FK DocumentFile>>
+    createdAt : Date
+  }
+
+  class ProduitAgreeEmbed <<embed>> {
+    type_produit_id : ObjectId <<FK Type_Produit>>
+    is_agree : Boolean
+  }
+
+  class Evaluation_Fournisseur {
+    _id : ObjectId
+    --
+    fournisseur_id : ObjectId <<FK Fournisseur>>
+    type_produit_id : ObjectId <<FK Type_Produit>>
+    date_eval : Date
+    notes_criteres : NoteCritereEmbed[]
+    score_final : Number <<auto: sum(note*coef)/100>>
+    commentaire : String
+    preuves : ObjectId[] <<FK DocumentFile>>
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class NoteCritereEmbed <<embed>> {
+    critere_id : ObjectId <<FK Critere_Eval_Fournisseur>>
+    note_saisie : Number <<0-5>>
+  }
+
+  class Reclamation_Fournisseur {
+    _id : ObjectId
+    --
+    fournisseur_id : ObjectId <<FK Fournisseur>>
+    date_reclamation : Date
+    description : String
+    gravite : Enum[faible, moyen, critique]
+    pnc_id : ObjectId <<FK PNC_Fiche>>
+    action_id : ObjectId <<FK Action>>
+    statut : Enum[ouverte, traitee, close]
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: SMART-RELEASE (Art. 8.6)
+' ============================================================
+package "13 · Smart-Release" #EEF8EE {
+
+  class SmartRelease {
+    _id : ObjectId
+    --
+    reference : String
+    designation : String
+    processus_id : ObjectId <<FK Processus>>
+    responsable_id : ObjectId <<FK User>>
+    date_controle : Date
+    status : Enum[enAttente, libere, bloque]
+    controls : ControlEmbed[]
+    autorise_par : ObjectId <<FK User>>
+    double_validation_required : Boolean
+    second_validateur_id : ObjectId <<FK User>>
+    certif_conformite_url : String
+    bon_livraison_url : String
+    nc_id : ObjectId <<FK NC>>
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class ControlEmbed <<embed>> {
+    intitule : String
+    specification : String
+    valeur_mesuree : String
+    instrument_id : ObjectId <<FK Equipement_Mesure>>
+    resultat : Enum[succes, echec, derogation]
+    commentaire : String
+  }
+
+}
+
+' ============================================================
+' PACKAGE: METROLOGIE
+' ============================================================
+package "14 · Métrologie" #FDEBD0 {
+
+  class Organisme_Metrologie {
+    _id : ObjectId
+    --
+    nom : String
+    contact : String
+    email : String
+    telephone : String
+    fournisseur_id : ObjectId <<FK Fournisseur>>
+  }
+
+  class Machine {
+    _id : ObjectId
+    --
+    nom_machine : String
+    processus_id : ObjectId <<FK Processus>>
+    axe2_ref : ObjectId <<FK DocumentationAxe>>
+  }
+
+  class Equipement_Mesure {
+    _id : ObjectId
+    --
+    code_id : String <<unique>>
+    designation : String
+    date_mise_en_service : Date
+    etat : Enum[conforme, horsService, aEtalonner, expire]
+    responsable_id : ObjectId <<FK Employee>>
+    machine_id : ObjectId <<FK Machine>>
+    processus_id : ObjectId <<FK Processus>>
+    fichier_fiche_vie : ObjectId <<FK DocumentFile>>
+    interventions : ObjectId[] <<FK Intervention_Metrologique>>
+    action_id : ObjectId <<FK Action>>
+    alert_sent : Boolean
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Intervention_Metrologique {
+    _id : ObjectId
+    --
+    equipement_id : ObjectId <<FK Equipement_Mesure>>
+    type_intervention : Enum[etalonnage, verification]
+    date_intervention : Date
+    date_echeance_prochaine : Date <<auto computed>>
+    resultat : Enum[conforme, nonConforme]
+    organisme_id : ObjectId <<FK Organisme_Metrologie>>
+    cout : Number
+    certificat_url : ObjectId <<FK DocumentFile>>
+    action_id : ObjectId <<FK Action>>
+    createdAt : Date
+  }
+
+  class RR_Analyse {
+    _id : ObjectId
+    --
+    equipement_id : ObjectId <<FK Equipement_Mesure>>
+    nb_operateurs : Number
+    nb_pieces : Number
+    valeurs_mesures : Mixed
+    pourcentage_rr : Number <<auto computed>>
+    resultat_statistique : String
+    alerte_envoye : Boolean
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: VEILLE REGLEMENTAIRE
+' ============================================================
+package "15 · Veille Réglementaire" #FDEDEC {
+
+  class VeilleItem {
+    _id : ObjectId
+    --
+    titre : String
+    source : String
+    date_publication : Date
+    domaine : Enum[douane, social, technique, environnement, sante, securite]
+    description : String
+    processus_ids : ObjectId[] <<FK Processus>>
+    niveau_risque : Enum[faible, moyen, critique]
+    compliance_status : Enum[conforme, nonConforme, enCours, nonApplicable]
+    action_id : ObjectId <<FK Action>>
+    created_by : ObjectId <<FK User>>
+    createdAt : Date
+    updatedAt : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: PLANNING (4 Flux)
+' ============================================================
+package "16 · Planning — 4 Flux" #EBF5FB {
+
+  class PlanningEvent {
+    _id : ObjectId
+    --
+    titre : String
+    flux : Enum[audit, kpi, reunion, documentaire]
+    processus_id : ObjectId <<FK Processus>>
+    date_debut : Date
+    date_fin : Date
+    recurrence : Enum[unique, mensuel, trimestriel, semestriel, annuel]
+    responsable_id : ObjectId <<FK User>>
+    participants : ObjectId[] <<FK User>>
+    status : Enum[planifie, realise, reporte, annule]
+    linked_id : ObjectId
+    linked_type : String <<Audit | Reunion | DocumentFile | Indicateur>>
+    alert_sent : Boolean
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+' PACKAGE: REUNIONS
+' ============================================================
+package "17 · Réunions" #EEF8EE {
+
+  class Reunion_Type {
+    _id : ObjectId
+    --
+    designation : String <<Revue de Direction, CODIR, Brainstorming>>
+    responsables_planification : ObjectId[] <<FK Employee>>
+    personnes_a_informer : ObjectId[] <<FK Employee>>
+  }
+
+  class Reunion {
+    _id : ObjectId
+    --
+    type_id : ObjectId <<FK Reunion_Type>>
+    objet : String
+    date_prev : Date
+    date_real : Date
+    lieu : String
+    ordre_du_jour : String[]
+    etat : Enum[planifiee, realisee]
+    duree_effective : Number <<minutes>>
+    commentaires_generaux : String
+    participants : ObjectId[] <<FK Participant>>
+    decisions : ObjectId[] <<FK Decision_Reunion>>
+    pv_url : ObjectId <<FK DocumentFile>>
+    createdAt : Date
+  }
+
+  class Participant {
+    _id : ObjectId
+    --
+    reunion_id : ObjectId <<FK Reunion>>
+    employee_id : ObjectId <<FK Employee>>
+    statut_participation : Enum[enAttente, confirme, decline]
+  }
+
+  class Decision_Reunion {
+    _id : ObjectId
+    --
+    reunion_id : ObjectId <<FK Reunion>>
+    libelle_decision : String
+    action_id : ObjectId <<FK Action>>
+    responsable_id : ObjectId <<FK Employee>>
+    echeance : Date
+    statut : Enum[ouverte, realisee]
+  }
+
+}
+
+' ============================================================
+' PACKAGE: REVUE DE PROCESSUS
+' ============================================================
+package "18 · Revue de Processus" #FDEBD0 {
+
+  class Critere_Eval_Processus {
+    _id : ObjectId
+    --
+    libelle : String <<Maîtrise doc, Atteinte KPIs, Nb PNC, Clôture actions>>
+    coefficient : Number
+  }
+
+  class Constat_Revue {
+    _id : ObjectId
+    --
+    revue_processus_id : ObjectId <<FK RevueProcessus>>
+    points_forts : String
+    points_faibles : String
+    opportunites_amelioration : String
+  }
+
+  class RevueProcessus {
+    _id : ObjectId
+    --
+    processus_id : ObjectId <<FK Processus isPublished=true>>
+    periode : String <<e.g. S1-2025>>
+    pilote_id : ObjectId <<FK Employee>>
+    evaluateur_id : ObjectId <<FK Employee>>
+    date_revue : Date
+    critere_evaluations : CritereEvalEmbed[]
+    score_maturite : Number <<1-5, auto computed>>
+    constats : ObjectId[] <<FK Constat_Revue>>
+    kpi_synthese : ObjectId[] <<FK Indicateur>>
+    nc_ids : ObjectId[] <<FK NC>>
+    audit_ids : ObjectId[] <<FK Audit>>
+    actions_prev_cloturees_pct : Number <<auto>>
+    actions : ObjectId[] <<FK Action>>
+    rapport_url : ObjectId <<FK DocumentFile>>
+    statut : Enum[brouillon, realise, archive]
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class CritereEvalEmbed <<embed>> {
+    critere_id : ObjectId <<FK Critere_Eval_Processus>>
+    note : Number <<1-5>>
+    commentaire : String
+  }
+
+}
+
+' ============================================================
+' PACKAGE: REVUE DE DIRECTION
+' ============================================================
+package "19 · Revue de Direction" #F4ECF7 {
+
+  class RevueDirection {
+    _id : ObjectId
+    --
+    periode_couverte : String <<ex: Année 2024>>
+    date_revue : Date
+    redacteur_id : ObjectId <<FK Employee>>
+    reunion_id : ObjectId <<FK Reunion>>
+    statut : Enum[brouillon, realise, cloture]
+    ' --- Chapitres de la revue ---
+    chapitres : ObjectId[] <<FK Chapitre_Revue>>
+    ' --- Liaisons automatiques ---
+    audits_bilan : Object <<résumé from Audit module>>
+    kpis_bilan : Object <<résumé from Indicateur module>>
+    clients_bilan : Object <<résumé from Enquete + Reclamation>>
+    fournisseurs_bilan : Object <<résumé from Evaluation_Fournisseur>>
+    actions_precedentes_bilan : BillanActionEmbed[]
+    swot : SWOTEmbed
+    ' --- Sortie ---
+    decisions : ObjectId[] <<FK Decision_Direction>>
+    pv_url : ObjectId <<FK DocumentFile>>
+    createdAt : Date
+    updatedAt : Date
+  }
+
+  class Chapitre_Revue {
+    _id : ObjectId
+    --
+    revue_direction_id : ObjectId <<FK RevueDirection>>
+    titre : String
+    ordre : Number
+    synthese_analyse : String <<rich text>>
+  }
+
+  class Decision_Direction {
+    _id : ObjectId
+    --
+    revue_direction_id : ObjectId <<FK RevueDirection>>
+    type : Enum[actionCorrective, opportuniteAmelioration, allocationRessources]
+    description : String
+    priorite_strategique : Enum[haute, moyenne, basse]
+    action_id : ObjectId <<FK Action>>
+  }
+
+  class BillanActionEmbed <<embed>> {
+    action_id : ObjectId <<FK Action>>
+    pilote : String
+    besoins_ressources : String
+    etat_avancement : Enum[enCours, realise, annule]
+  }
+
+  class SWOTEmbed <<embed>> {
+    opportunites : String[]
+    menaces : String[]
+    forces : String[]
+    faiblesses : String[]
+  }
+
+}
+
+' ============================================================
+' RELATIONSHIPS
+' ============================================================
+
+' --- Identity ---
+User "1" -- "0..1" Employee : linked to
+User "1" -- "0..1" Processus : assigned pilot
+User "*" -- "1" Site : belongs to
+
+' --- GRH ---
+Employee "*" -- "1" Processus : pilote de
+Employee "1" -- "1" Fonction : has profile
+Employee "1" -- "*" Habilitation : possède
+Employee "1" -- "*" Formation_Demande : demande
+Fonction "1" -- "*" QualifRequiseEmbed
+Formation "*" -- "*" Employee : concerne
+Formation "1" -- "1" ScoreChaudEmbed
+Formation "1" -- "1" ScoreFroidEmbed
+
+' --- Documentation ---
+Processus "1" -- "5" DocumentationAxe : structuré en
+DocumentationAxe "1" -- "*" DocumentFile : contient
+DocumentFile "1" -- "*" ModifLogEmbed : logs
+DocumentFile "1" -- "*" ListeDiffusion : diffusé via
+ListeDiffusion "1" -- "*" AccuseEmbed
+DocumentFile "*" -- "*" DocumentFile : documents_renvoi
+
+' --- KPI ---
+Processus "1" -- "*" Indicateur : mesure par
+Indicateur "1" -- "*" Indicateur_Valeur : valeurs
+Indicateur "1" -- "*" Historique_Cible : cibles
+
+' --- Risques ---
+Processus "1" -- "*" Risque_Fiche : expose à
+Risque_Fiche "1" -- "1" Calcul_Methode
+Risque_Fiche "1" -- "1" Risque_Domaine
+Risque_Fiche "1" -- "2" ScoreRisqueEmbed
+Risque_Domaine "1" -- "*" Critere_Evaluation_Risque
+
+' --- NC ---
+NC "*" -- "1" Processus : concerne
+NC "*" -- "*" Action : génère
+
+' --- PNC ---
+PNC_Fiche "1" -- "*" PNC_Detail : contient produits
+PNC_Fiche "1" -- "1" Traitement_PNC
+PNC_Fiche "1" -- "0..1" NC : liée à
+PNC_Fiche "1" -- "0..1" Reclamation_Client : origine
+
+' --- Actions ---
+Action "1" -- "*" Sous_Action : décomposée en
+Action "1" -- "*" Action_Log : tracée par
+Action "*" -- "1" Processus : assignée à
+Action "*" -- "1" Direction : pilotée par
+Action "*" -- "*" DocumentFile : preuves
+
+' --- Audits ---
+Audit "*" -- "1" Processus : porte sur
+Audit "*" -- "1" Audit_Parametre : paramétré par
+Audit "1" -- "*" Constat_Ecart : génère
+Constat_Ecart "1" -- "1" Action : crée
+Audit "1" -- "*" NC : génère
+
+' --- Clients ---
+Client "1" -- "*" Reclamation_Client : soumet
+Client "1" -- "*" Enquete : sondé par
+Enquete "1" -- "*" ReponseEmbed
+Reclamation_Client "1" -- "0..1" Action : déclenche
+Reclamation_Client "1" -- "0..1" PNC_Fiche : déclenche
+
+' --- Fournisseurs ---
+Fournisseur "1" -- "*" Evaluation_Fournisseur : évalué par
+Evaluation_Fournisseur "1" -- "*" NoteCritereEmbed
+Fournisseur "1" -- "*" Reclamation_Fournisseur : reçoit
+Reclamation_Fournisseur "1" -- "0..1" Action : déclenche
+Reclamation_Fournisseur "1" -- "0..1" PNC_Fiche : liée à
+
+' --- SmartRelease ---
+SmartRelease "1" -- "*" ControlEmbed : contient
+SmartRelease "1" -- "0..1" NC : déclenche
+SmartRelease "*" -- "1" Processus : appartient à
+
+' --- Metrologie ---
+Equipement_Mesure "1" -- "*" Intervention_Metrologique : subit
+Equipement_Mesure "1" -- "*" RR_Analyse : analysé par
+Equipement_Mesure "*" -- "1" Processus
+Intervention_Metrologique "1" -- "0..1" Action : déclenche
+Organisme_Metrologie "1" -- "0..1" Fournisseur : lié à
+
+' --- SmartRelease interlocked with Metrologie ---
+ControlEmbed "*" -- "1" Equipement_Mesure : utilise
+
+' --- Veille ---
+VeilleItem "*" -- "*" Processus
+VeilleItem "1" -- "0..1" Action : force
+
+' --- Réunions ---
+Reunion "*" -- "1" Reunion_Type
+Reunion "1" -- "*" Participant
+Reunion "1" -- "*" Decision_Reunion
+Decision_Reunion "1" -- "0..1" Action : génère
+
+' --- Revue Processus ---
+RevueProcessus "*" -- "1" Processus
+RevueProcessus "1" -- "*" Constat_Revue
+RevueProcessus "1" -- "*" Action : génère
+
+' --- Revue Direction ---
+RevueDirection "1" -- "*" Chapitre_Revue
+RevueDirection "1" -- "*" Decision_Direction
+Decision_Direction "1" -- "0..1" Action : génère
+RevueDirection "1" -- "0..1" Reunion : tenue lors
+
+@enduml

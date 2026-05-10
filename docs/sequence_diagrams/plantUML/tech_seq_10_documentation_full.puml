@@ -1,0 +1,62 @@
+@startuml TECH-SEQ-10-Documentation-Full
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam ParticipantBackgroundColor #F4ECF7
+skinparam ParticipantBorderColor #8E44AD
+
+title Qualibot-Hub — Séquence Technique Détaillée : Workflow Documentation (MERN)
+
+actor "Superviseur / Rédacteur" as User
+participant "React\nFront-End" as UI
+participant "api.ts\n(Axios)" as Api
+participant "Express Router\n(/api/v1/documentation)" as Router
+participant "DocumentController" as Ctrl
+participant "S3 / BlobStorage" as Storage
+database "MongoDB\n(DocumentFile, ListeDiffusion)" as DB
+
+== Phase A : Ajout / Mise à Jour d'un Manuel (Axe 3) ==
+User -> UI : Upload PDF, sélectionne Processus (Axe 3) et Verificateurs
+UI -> Api : POST /api/v1/documentation/files (Multipart form-data)
+Api -> Router : HTTP POST
+Router -> Ctrl : uploadDocument(req, res)
+
+Ctrl -> Storage : putObject(req.file.buffer)
+Storage --> Ctrl : fileUrl (AWS S3 / Supabase Storage url)
+
+Ctrl -> DB : DocumentFile.create({ axe_id, fileUrl, statut: 'enVerification', verificateurs, ... })
+DB --> Ctrl : docFile
+
+Ctrl --> Api : HTTP 201 Created
+Api --> UI : Affiche PDF Récemment Ajouté (Statut: En Vérification)
+
+== Phase B : Circuit de Validation ==
+actor "Vérificateur" as Validateur
+Validateur -> UI : Ouvre le document et clique "Approuver"
+UI -> Api : PATCH /api/v1/documentation/files/:id/validate
+Api -> Router : HTTP PATCH
+Router -> Ctrl : validateDocument(req, res)
+
+Ctrl -> DB : findOneAndUpdate({ _id: id, verificateurs: req.user.id })
+DB --> Ctrl : docFile
+Ctrl -> DB : if all approved -> update({ statut: 'enVigueur', date_mise_en_vigueur: NOW })
+
+Ctrl --> Api : HTTP 200 OK
+Api --> UI : Statut passe à "En Vigueur"
+
+== Phase C : Diffusion & Accusé de Réception ==
+Ctrl -> DB : ListeDiffusion.create({ document_id: id, destinataires: [...] })
+DB --> Ctrl : listeDoc
+
+note over Ctrl, DB: Un CronJob node-cron vérifie\nles reviewDueDate (12 mois) et déclenche\ndes Actions si périmés.
+
+actor "Opérateur" as Op
+Op -> UI : Clique sur le Manuel
+UI -> Api : GET /api/v1/documentation/files/:id/read
+Api -> Router : HTTP GET
+Router -> Ctrl : trackReading(req, res)
+Ctrl -> DB : ListeDiffusion.updateOne({ 'accuses_reception.employee_id': req.user.employee_id }, { $set: { 'accuses_reception.$.isConfirmed': true } })
+Ctrl --> Api : HTTP 200 { fileUrl }
+Api --> UI : Affiche le PDF
+
+@enduml

@@ -1,0 +1,44 @@
+@startuml UC-01-Audit
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+
+title Qualibot-Hub — Use Cases : Module Audit
+
+actor Administrateur
+actor "Auditeur\n(Interne/Externe)" as Auditeur
+actor "Audité" as Audite
+
+rectangle "Module Audit" {
+  usecase "Paramétrer les éléments d'Audit\n(Gravités, Types, Accès)" as UC_Param
+  usecase "Planifier un Audit" as UC_Plan
+  usecase "Consulter son Planning d'Audit" as UC_Consult
+  usecase "Réaliser l'Audit\n(Saisir la checklist)" as UC_Realise
+  usecase "Déclarer un Constat d'Écart" as UC_Ecart
+  usecase "Renseigner l'analyse des causes\n(Action Aval)" as UC_Aval
+  usecase "Valider et Diffuser le Rapport" as UC_Valider
+}
+
+Administrateur --> UC_Param
+Administrateur --> UC_Plan
+Administrateur --> UC_Valider
+
+Auditeur --> UC_Consult
+Audite --> UC_Consult
+
+Auditeur --> UC_Realise
+Auditeur --> UC_Ecart
+
+UC_Ecart ..> UC_Aval : <<include>>
+Audite --> UC_Aval
+
+package "Modules Externes" {
+  usecase "Générer Alerte Agenda" as UC_Agenda
+  usecase "Créer Action Corrective" as UC_Action
+}
+
+UC_Plan ..> UC_Agenda : <<include>>
+UC_Ecart ..> UC_Action : <<include>>
+UC_Valider ..> UC_Agenda : <<include>>
+
+@enduml

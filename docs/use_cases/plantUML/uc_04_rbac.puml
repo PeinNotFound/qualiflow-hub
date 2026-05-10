@@ -1,0 +1,58 @@
+@startuml UC-04-RBAC
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle hollow
+
+title Qualibot-Hub — Architecture des Rôles & Privilèges (RBAC - Option B)
+
+actor "Super Administrateur" as SuperAdmin
+actor "Administrateur\n(Resp. Qualité / RH)" as Admin
+actor "Éditeur\n(Pilote / Contributeur)" as Editor
+actor "Observateur / Viewer\n(Opérateur)" as Viewer
+
+rectangle "Système Qualibot-Hub" {
+  
+  package "Niveau Système (Global)" {
+    usecase "Gérer les Utilisateurs et les Rôles" as UC_Users
+    usecase "Gérer les Employés (GRH)" as UC_GRH
+    usecase "Paramétrer les Processus" as UC_Processus
+  }
+
+  package "Niveau Processus (Restreint par ID)" {
+    usecase "Créer / Éditer des Actions & PNC" as UC_WriteAction
+    usecase "Saisir les Valeurs d'Indicateurs (KPI)" as UC_WriteKPI
+    usecase "Réaliser et Valider un Audit" as UC_WriteAudit
+    usecase "Approuver un Document (Vérificateur)" as UC_WriteDoc
+  }
+
+  package "Niveau Lecture Seule (Global)" {
+    usecase "Consulter les Procédures & Manuels" as UC_ReadDoc
+    usecase "Visualiser les Dashboards & KPI" as UC_ReadDash
+    usecase "Voir le statut des Actions" as UC_ReadActions
+  }
+}
+
+' --- Super Admin a tous les droits ---
+SuperAdmin --> UC_Users
+SuperAdmin -|> Admin : <<hérite>>
+
+' --- Admin a les droits globaux métier ---
+Admin --> UC_GRH
+Admin --> UC_Processus
+Admin -|> Editor : <<hérite accès global>>
+
+' --- Editor a les droits d'écriture RESTREINTS ---
+note "Droits d'Écriture\nconditionnés au fait que\nUser.processus_id == Data.processus_id" as NoteRestreint
+Editor .. NoteRestreint
+NoteRestreint ..> UC_WriteAction
+NoteRestreint ..> UC_WriteKPI
+NoteRestreint ..> UC_WriteAudit
+NoteRestreint ..> UC_WriteDoc
+Editor -|> Viewer : <<hérite>>
+
+' --- Viewer a uniquement les droits de lecture ---
+Viewer --> UC_ReadDoc
+Viewer --> UC_ReadDash
+Viewer --> UC_ReadActions
+
+@enduml

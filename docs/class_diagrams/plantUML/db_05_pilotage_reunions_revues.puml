@@ -1,0 +1,258 @@
+@startuml DB-05 Pilotage Reunions Revues
+!theme plain
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam packageFontSize 12
+skinparam ClassBorderColor #2c3e50
+skinparam ClassBackgroundColor #ecf0f1
+
+title Qualibot-Hub — DB-05: Pilotage, Reunions & Revues
+
+' Stubs
+class Action <<stub>> {
+  _id : ObjectId
+}
+class Processus <<stub>> {
+  _id : ObjectId
+  code : String
+}
+class Employee <<stub>> {
+  _id : ObjectId
+  nom : String
+}
+class DocumentFile <<stub>> {
+  _id : ObjectId
+}
+class NC <<stub>> {
+  _id : ObjectId
+}
+class Audit <<stub>> {
+  _id : ObjectId
+}
+class Indicateur <<stub>> {
+  _id : ObjectId
+}
+
+' ============================================================
+package "Veille Reglementaire" #FDEDEC {
+
+  class VeilleItem {
+    _id : ObjectId
+    --
+    titre : String
+    source : String
+    date_publication : Date
+    domaine : Enum[douane, social, technique, environnement, sante, securite]
+    description : String
+    processus_ids : ObjectId[] <<FK Processus>>
+    niveau_risque : Enum[faible, moyen, critique]
+    compliance_status : Enum[conforme, nonConforme, enCours, nonApplicable]
+    action_id : ObjectId <<FK Action>>
+    created_by : ObjectId <<FK User>>
+    createdAt : Date
+    updatedAt : Date
+  }
+
+}
+
+' ============================================================
+package "Planning - 4 Flux" #EBF5FB {
+
+  class PlanningEvent {
+    _id : ObjectId
+    --
+    titre : String
+    flux : Enum[audit, kpi, reunion, documentaire]
+    processus_id : ObjectId <<FK Processus>>
+    date_debut : Date
+    date_fin : Date
+    recurrence : Enum[unique, mensuel, trimestriel, semestriel, annuel]
+    responsable_id : ObjectId <<FK User>>
+    participants : ObjectId[] <<FK User>>
+    status : Enum[planifie, realise, reporte, annule]
+    linked_id : ObjectId
+    linked_type : String
+    alert_sent : Boolean
+    createdAt : Date
+  }
+
+}
+
+' ============================================================
+package "Reunions" #EEF8EE {
+
+  class Reunion_Type {
+    _id : ObjectId
+    --
+    designation : String
+    responsables_planification : ObjectId[] <<FK Employee>>
+    personnes_a_informer : ObjectId[] <<FK Employee>>
+  }
+
+  class Reunion {
+    _id : ObjectId
+    --
+    type_id : ObjectId <<FK Reunion_Type>>
+    objet : String
+    date_prev : Date
+    date_real : Date
+    lieu : String
+    ordre_du_jour : String[]
+    etat : Enum[planifiee, realisee]
+    duree_effective : Number <<minutes>>
+    commentaires_generaux : String
+    pv_url : ObjectId <<FK DocumentFile>>
+    createdAt : Date
+  }
+
+  class Participant {
+    _id : ObjectId
+    --
+    reunion_id : ObjectId <<FK Reunion>>
+    employee_id : ObjectId <<FK Employee>>
+    statut_participation : Enum[enAttente, confirme, decline]
+  }
+
+  class Decision_Reunion {
+    _id : ObjectId
+    --
+    reunion_id : ObjectId <<FK Reunion>>
+    libelle_decision : String
+    action_id : ObjectId <<FK Action>>
+    responsable_id : ObjectId <<FK Employee>>
+    echeance : Date
+    statut : Enum[ouverte, realisee]
+  }
+
+}
+
+' ============================================================
+package "Revue de Processus" #FDEBD0 {
+
+  class Critere_Eval_Processus {
+    _id : ObjectId
+    --
+    libelle : String
+    coefficient : Number
+  }
+
+  class Constat_Revue {
+    _id : ObjectId
+    --
+    revue_processus_id : ObjectId <<FK RevueProcessus>>
+    points_forts : String
+    points_faibles : String
+    opportunites_amelioration : String
+  }
+
+  class CritereEvalEmbed <<embed>> {
+    critere_id : ObjectId <<FK Critere_Eval_Processus>>
+    note : Number <<1-5>>
+    commentaire : String
+  }
+
+  class RevueProcessus {
+    _id : ObjectId
+    --
+    processus_id : ObjectId <<FK Processus>>
+    periode : String
+    pilote_id : ObjectId <<FK Employee>>
+    evaluateur_id : ObjectId <<FK Employee>>
+    date_revue : Date
+    critere_evaluations : CritereEvalEmbed[]
+    score_maturite : Number <<1-5, auto computed>>
+    constats : ObjectId[] <<FK Constat_Revue>>
+    kpi_synthese : ObjectId[] <<FK Indicateur>>
+    nc_ids : ObjectId[] <<FK NC>>
+    audit_ids : ObjectId[] <<FK Audit>>
+    actions_prev_cloturees_pct : Number <<auto>>
+    actions : ObjectId[] <<FK Action>>
+    rapport_url : ObjectId <<FK DocumentFile>>
+    statut : Enum[brouillon, realise, archive]
+    createdAt : Date
+    updatedAt : Date
+  }
+
+}
+
+' ============================================================
+package "Revue de Direction" #F4ECF7 {
+
+  class Chapitre_Revue {
+    _id : ObjectId
+    --
+    revue_direction_id : ObjectId <<FK RevueDirection>>
+    titre : String
+    ordre : Number
+    synthese_analyse : String
+  }
+
+  class Decision_Direction {
+    _id : ObjectId
+    --
+    revue_direction_id : ObjectId <<FK RevueDirection>>
+    type : Enum[actionCorrective, opportuniteAmelioration, allocationRessources]
+    description : String
+    priorite_strategique : Enum[haute, moyenne, basse]
+    action_id : ObjectId <<FK Action>>
+  }
+
+  class BillanActionEmbed <<embed>> {
+    action_id : ObjectId <<FK Action>>
+    pilote : String
+    besoins_ressources : String
+    etat_avancement : Enum[enCours, realise, annule]
+  }
+
+  class SWOTEmbed <<embed>> {
+    opportunites : String[]
+    menaces : String[]
+    forces : String[]
+    faiblesses : String[]
+  }
+
+  class RevueDirection {
+    _id : ObjectId
+    --
+    periode_couverte : String
+    date_revue : Date
+    redacteur_id : ObjectId <<FK Employee>>
+    reunion_id : ObjectId <<FK Reunion>>
+    statut : Enum[brouillon, realise, cloture]
+    chapitres : ObjectId[] <<FK Chapitre_Revue>>
+    audits_bilan : Mixed
+    kpis_bilan : Mixed
+    clients_bilan : Mixed
+    fournisseurs_bilan : Mixed
+    actions_precedentes_bilan : BillanActionEmbed[]
+    swot : SWOTEmbed
+    decisions : ObjectId[] <<FK Decision_Direction>>
+    pv_url : ObjectId <<FK DocumentFile>>
+    createdAt : Date
+    updatedAt : Date
+  }
+
+}
+
+' RELATIONSHIPS
+VeilleItem "*" -- "*" Processus : impacte
+VeilleItem "1" -- "0..1" Action : force
+
+PlanningEvent "*" -- "1" Processus : concerne
+
+Reunion "*" -- "1" Reunion_Type : type
+Reunion "1" -- "*" Participant : invites
+Reunion "1" -- "*" Decision_Reunion : decisions
+Decision_Reunion "1" -- "0..1" Action : genere
+
+RevueProcessus "*" -- "1" Processus : evalue
+RevueProcessus "1" -- "*" Constat_Revue : constats
+RevueProcessus "1" -- "*" Action : genere
+
+RevueDirection "1" -- "*" Chapitre_Revue : chapitres
+RevueDirection "1" -- "*" Decision_Direction : decisions
+Decision_Direction "1" -- "0..1" Action : genere
+RevueDirection "1" -- "0..1" Reunion : tenue lors
+
+@enduml
