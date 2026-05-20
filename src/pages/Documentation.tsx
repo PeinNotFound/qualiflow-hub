@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/qh/StatusBadge";
 import { FileText, IdCard, GitBranch, BookOpen, Activity, Archive, Sparkles, Search, FileCheck, Plus, Loader2, Send, Workflow, ExternalLink, Settings2, FolderArchive, Users, ArrowRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { toast } from "sonner";
 import { docsInternes, docsExternes, typesDoc, type DocStatus, docStatusLabel } from "@/lib/mock-data";
 

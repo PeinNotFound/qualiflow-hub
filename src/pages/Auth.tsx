@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,36 +6,51 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
 
+  // Référence pour basculer vers l'onglet connexion après inscription (Option A)
+  const tabsRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => { if (!loading && user) navigate("/", { replace: true }); }, [user, loading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (error) toast.error(error.message); else { toast.success("Connecté"); navigate("/"); }
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await signIn(email, password);
+      toast.success("Connecté avec succès");
+      navigate("/");
+    } catch (err: any) {
+      const message = err.response?.data?.message || err.message || "Identifiants incorrects";
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault(); setBusy(true);
-    const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { emailRedirectTo: window.location.origin, data: { full_name: fullName } }
-    });
-    setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success("Compte créé. Vérifiez votre email pour confirmer.");
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await signUp(email, password, fullName);
+      toast.success("Compte créé. Veuillez vous connecter.");
+      // Option A : basculer vers l'onglet connexion sans connexion automatique
+      tabsRef.current?.click();
+    } catch (err: any) {
+      const message = err.response?.data?.message || err.message || "Erreur lors de l'inscription";
+      toast.error(message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -85,7 +100,8 @@ export default function AuthPage() {
 
           <Tabs defaultValue="signin">
             <TabsList className="grid grid-cols-2 mb-6">
-              <TabsTrigger value="signin">Connexion</TabsTrigger>
+              {/* ref pour retourner sur l'onglet connexion après inscription */}
+              <TabsTrigger value="signin" ref={tabsRef}>Connexion</TabsTrigger>
               <TabsTrigger value="signup">Créer un compte</TabsTrigger>
             </TabsList>
 

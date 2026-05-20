@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+// On récupère le hook useAuth pour accéder à l'utilisateur connecté et ses rôles
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+// On importe notre client Axios centralisé (qui injecte automatiquement le token JWT)
+// SUPPRIMÉ : import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { PageHeader } from "@/components/qh/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,33 +15,79 @@ import { User as UserIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Profil() {
+  // On récupère l'utilisateur connecté et ses rôles depuis le contexte d'authentification
   const { user, roles } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ full_name: "", job_title: "", department: "", site: "" });
 
+  // État local du formulaire initialisé avec des chaînes vides
+  const [form, setForm] = useState({
+    full_name: "",
+    job_title: "",
+    department: "",
+    site: "",
+  });
+
+  // Chargement initial des données de profil depuis le backend (GET /auth/me)
+  // AVANT : supabase.from("profiles").select("*").eq("id", user.id)
+  // APRÈS  : api.get("/auth/me") — la réponse contient user + roles via JWT
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle().then(({ data }) => {
-      if (data) setForm({
-        full_name: data.full_name ?? "", job_title: data.job_title ?? "",
-        department: data.department ?? "", site: data.site ?? "",
-      });
-      setLoading(false);
-    });
+
+    const fetchProfile = async () => {
+      try {
+        // Appel au backend pour récupérer les données fraîches du profil connecté
+        // Le token JWT est injecté automatiquement par l'intercepteur de api.ts
+        const response = await api.get("/auth/me");
+        const profileData = response.data.user;
+
+        // On hydrate le formulaire avec les données retournées par le serveur
+        setForm({
+          full_name:  profileData.full_name  ?? "",
+          job_title:  profileData.job_title  ?? "",
+          department: profileData.department ?? "",
+          site:       profileData.site       ?? "",
+        });
+      } catch (err: any) {
+        // En cas d'erreur réseau ou de token expiré, on informe l'utilisateur
+        const message = err.response?.data?.message || "Impossible de charger le profil";
+        toast.error(message);
+      } finally {
+        // Désactivation du spinner de chargement dans tous les cas
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
   }, [user]);
 
+  // Sauvegarde des modifications du profil (PUT /profiles/me)
+  // AVANT : supabase.from("profiles").update(form).eq("id", user.id)
+  // APRÈS  : api.put("/profiles/me", form) — le backend identifie l'utilisateur via le JWT
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase.from("profiles").update(form).eq("id", user.id);
-    setSaving(false);
-    if (error) toast.error(error.message); else toast.success("Profil mis à jour");
+    try {
+      // On envoie les données du formulaire au backend
+      // Pas besoin de passer l'ID utilisateur : le backend le déduit du token JWT
+      await api.put("/profiles/me", form);
+      toast.success("Profil mis à jour");
+    } catch (err: any) {
+      const message = err.response?.data?.message || "Erreur lors de la sauvegarde";
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  // Affichage d'un spinner pendant que les données de profil se chargent
+  if (loading) return (
+    <div className="flex justify-center p-8">
+      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div className="max-w-2xl">
@@ -46,7 +95,9 @@ export default function Profil() {
       <Card>
         <CardHeader>
           <CardTitle>Informations personnelles</CardTitle>
+          {/* Affichage de l'email de l'utilisateur connecté (non modifiable) */}
           <CardDescription>{user?.email}</CardDescription>
+          {/* Affichage des rôles de l'utilisateur sous forme de badges */}
           <div className="flex flex-wrap gap-1.5 pt-1">
             {roles.map(r => <Badge key={r} variant="secondary" className="capitalize">{r}</Badge>)}
           </div>
