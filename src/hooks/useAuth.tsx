@@ -1,57 +1,86 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 
 export type AppRole = "admin" | "pilote" | "auditeur" | "operateur";
 
+export interface User {
+  id: string;
+  email: string;
+  full_name?: string;
+  job_title?: string | null;
+  department?: string | null;
+  site?: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   roles: AppRole[];
   loading: boolean;
-  signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Au chargement de l'application, vérifier si un token existe et valider la session via GET /auth/me
+  // C'est la source de vérité — pas le localStorage
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-      setUser(sess?.user ?? null);
-      if (sess?.user) {
-        setTimeout(async () => {
-          const { data } = await supabase.from("user_roles").select("role").eq("user_id", sess.user.id);
-          setRoles((data ?? []).map(r => r.role as AppRole));
-        }, 0);
-      } else {
-        setRoles([]);
+    const initializeAuth = async () => {
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          const response = await api.get("/auth/me");
+          const { user: currentUser, roles: currentRoles } = response.data;
+          setUser(currentUser);
+          setRoles(currentRoles || []);
+          // Mettre à jour le cache local avec les données fraîches du serveur
+          localStorage.setItem("user", JSON.stringify(currentUser));
+        } catch {
+          // Token invalide ou expiré — nettoyer le stockage local
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+        }
       }
-    });
-
-    supabase.auth.getSession().then(({ data: { session: sess } }) => {
-      setSession(sess);
-      setUser(sess?.user ?? null);
       setLoading(false);
-      if (sess?.user) {
-        supabase.from("user_roles").select("role").eq("user_id", sess.user.id).then(({ data }) => {
-          setRoles((data ?? []).map(r => r.role as AppRole));
-        });
-      }
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    initializeAuth();
   }, []);
 
-  const signOut = async () => { await supabase.auth.signOut(); };
+  const signIn = async (email: string, password: string) => {
+    const response = await api.post("/auth/login", { email, password });
+    const { token, user: loggedUser, roles: userRoles } = response.data;
+
+    // Stocker le token et l'utilisateur de manière cohérente
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(loggedUser));
+
+    setUser(loggedUser);
+    setRoles(userRoles || []);
+  };
+
+  // Option A : après inscription, l'utilisateur doit se connecter manuellement
+  const signUp = async (email: string, password: string, fullName: string) => {
+    await api.post("/auth/register", { email, password, full_name: fullName });
+  };
+
+  const signOut = () => {
+    // Nettoyage complet et simultané du stockage local
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null);
+    setRoles([]);
+    window.location.href = "/auth";
+  };
 
   return (
-    <AuthContext.Provider value={{ user, session, roles, loading, signOut }}>
+    <AuthContext.Provider value={{ user, roles, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

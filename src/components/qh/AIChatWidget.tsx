@@ -3,7 +3,7 @@ import { MessageSquare, X, Send, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/lib/api";
 import { useLocation } from "react-router-dom";
 import { moduleBySlug } from "@/lib/modules";
 import { toast } from "sonner";
