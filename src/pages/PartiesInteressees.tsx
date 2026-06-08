@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Users, Plus, Bell, AlertCircle, CheckCircle2, Scale, Heart, Wallet } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, Plus, Bell, AlertCircle, CheckCircle2, Scale, Heart, Wallet, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/qh/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { ParamCard, KPICard } from "@/components/qh/ParamCard";
 import { toast } from "sonner";
+import { get, post } from "@/lib/api";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input as InputField } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Categorie = "Légal" | "Financier" | "Social" | "Environnemental" | "Opérationnel";
 type Statut = "À traiter" | "En cours" | "Conforme" | "Écart";
@@ -66,9 +71,48 @@ const statutVariant = (s: Statut) =>
   s === "Conforme" ? "default" : s === "Écart" ? "destructive" : s === "En cours" ? "secondary" : "outline";
 
 export default function PartiesInteressees() {
-  const [parties] = useState(initial);
-  const allBesoins = parties.flatMap(p => p.besoins.map(b => ({ ...b, partie: p.nom })));
-  const tauxConformite = Math.round((allBesoins.filter(b => b.statut === "Conforme").length / allBesoins.length) * 100);
+  const [items, setItems] = useState<any[]>(initial);
+  const [loading, setLoading] = useState(true);
+  const [openNew, setOpenNew] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchPI();
+  }, []);
+
+  const fetchPI = async () => {
+    try {
+      const data: any = await get("/api/parties_interessees");
+      setItems(data.data.length > 0 ? data.data : initial);
+    } catch (error) {
+      console.error("Failed to fetch PI", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      await post("/api/parties_interessees", payload);
+      toast.success("Partie intéressée créée avec succès");
+      setOpenNew(false);
+      fetchPI();
+    } catch (error) {
+      toast.error("Erreur lors de la création de la PI");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const allBesoins = items.flatMap(p => (p.besoins || []).map((b: any) => ({ ...b, partie: p.nom })));
+  const tauxConformite = allBesoins.length > 0 
+    ? Math.round((allBesoins.filter(b => b.statut === "Conforme").length / allBesoins.length) * 100)
+    : 0;
 
   return (
     <>
@@ -77,11 +121,53 @@ export default function PartiesInteressees() {
         description="Identification des PI, attentes & besoins (légaux, financiers, sociaux) — notification automatique du responsable concerné"
         iso="4.2"
         icon={<Users className="h-5 w-5" />}
-        actions={<Button><Plus className="h-4 w-4 mr-2" />Nouvelle partie intéressée</Button>}
+        actions={
+          <Dialog open={openNew} onOpenChange={setOpenNew}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" />Nouvelle partie intéressée</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Ajouter une partie intéressée</DialogTitle>
+                <DialogDescription>Identifiez une nouvelle PI interne ou externe.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreate}>
+                <div className="grid gap-3 py-4">
+                  <div className="space-y-1">
+                    <Label>Nom / Raison</Label>
+                    <InputField name="nom" placeholder="Ex: ANP" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Type</Label>
+                      <Select name="type" defaultValue="Externe">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Interne">Interne</SelectItem>
+                          <SelectItem value="Externe">Externe</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Catégorie</Label>
+                      <InputField name="categorie" placeholder="Ex: Réglementaire" />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Enregistrer
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KPICard title="Parties identifiées" value={parties.length} icon={<Users className='h-4 w-4' />} />
+        <KPICard title="Parties identifiées" value={items.length} icon={<Users className='h-4 w-4' />} />
         <KPICard title="Besoins / attentes" value={allBesoins.length} icon={<Bell className='h-4 w-4' />} />
         <KPICard title="Taux de conformité" value={`${tauxConformite}%`} icon={<CheckCircle2 className='h-4 w-4' />} />
         <KPICard title="Écarts ouverts" value={allBesoins.filter(b => b.statut === "Écart").length} icon={<AlertCircle className='h-4 w-4' />} />
@@ -96,41 +182,47 @@ export default function PartiesInteressees() {
         </TabsList>
 
         <TabsContent value="cartographie" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {parties.map(p => {
-              const conformes = p.besoins.filter(b => b.statut === "Conforme").length;
-              const taux = Math.round((conformes / p.besoins.length) * 100);
-              return (
-                <Card key={p.id}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base">{p.nom}</CardTitle>
-                      <Badge variant={p.type === "Interne" ? "secondary" : "outline"}>{p.type}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{p.categorie}</p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xs mb-2 flex justify-between">
-                      <span>Conformité</span><span className="font-mono">{taux}%</span>
-                    </div>
-                    <Progress value={taux} className="h-1.5 mb-3" />
-                    <div className="space-y-1.5">
-                      {p.besoins.map(b => {
-                        const Icon = catIcon[b.cat];
-                        return (
-                          <div key={b.id} className="flex items-center gap-2 text-xs">
-                            <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
-                            <span className="flex-1 truncate">{b.libelle}</span>
-                            <Badge variant={statutVariant(b.statut)} className="text-[9px]">{b.statut}</Badge>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4">
+              {items.map(p => {
+                const conformes = (p.besoins || []).filter((b: any) => b.statut === "Conforme").length;
+                const total = (p.besoins || []).length;
+                const taux = total > 0 ? Math.round((conformes / total) * 100) : 0;
+                return (
+                  <Card key={p.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">{p.nom}</CardTitle>
+                        <Badge variant={p.type === "Interne" ? "secondary" : "outline"}>{p.type}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{p.categorie}</p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-xs mb-2 flex justify-between">
+                        <span>Conformité</span><span className="font-mono">{taux}%</span>
+                      </div>
+                      <Progress value={taux} className="h-1.5 mb-3" />
+                      <div className="space-y-1.5">
+                        {(p.besoins || []).map((b: any) => {
+                          const Icon = catIcon[b.cat as Categorie] || CheckCircle2;
+                          return (
+                            <div key={b.id || b.libelle} className="flex items-center gap-2 text-xs">
+                              <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="flex-1 truncate">{b.libelle}</span>
+                              <Badge variant={statutVariant(b.statut)} className="text-[9px]">{b.statut}</Badge>
+                            </div>
+                          );
+                        })}
+                        {total === 0 && <div className="text-[10px] text-muted-foreground italic">Aucun besoin identifié</div>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="besoins">

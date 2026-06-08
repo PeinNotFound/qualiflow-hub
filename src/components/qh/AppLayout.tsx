@@ -2,7 +2,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Search, User as UserIcon } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
-import { AIChatWidget } from "./AIChatWidget";
+import { NotificationCenter } from "./NotificationCenter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,10 +28,7 @@ export const AppLayout = () => {
               <Input placeholder="Rechercher procédures, audits, actions…" className="pl-9 h-9 bg-muted/40 border-border" />
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-4 w-4" />
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive" />
-              </Button>
+              <NotificationCenter />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2">
@@ -65,7 +62,6 @@ export const AppLayout = () => {
             <Outlet />
           </main>
         </div>
-        <AIChatWidget />
       </div>
     </SidebarProvider>
   );

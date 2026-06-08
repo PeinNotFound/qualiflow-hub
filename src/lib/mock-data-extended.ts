@@ -14,7 +14,7 @@ export const themesAction = [
   { name: "Satisfaction client", ordre: 4 },
 ];
 
-export type ActionStatut = "demande" | "validation" | "refusee" | "en_cours" | "realisee" | "evaluee" | "cloturee";
+export type ActionStatut = "enAttente" | "validee" | "refusee" | "enCours" | "realisee" | "evaluee" | "cloturee";
 export interface SousAction {
   id: string; libelle: string; respRealisation: string; respSuivi: string;
   delai: string; tauxRealisation: number; tauxEfficacite: number;
@@ -42,7 +42,7 @@ export const actions: ActionRecord[] = [
     type: "Action corrective", source: "Audit interne",
     description: "Suite à l'audit AUD-2026-001, PRO-LOG-01 v3.1 utilisée alors que v3.2 en vigueur.",
     causes: ["Méthode", "Main d'œuvre"], directionPilote: "Direction Logistique", metier: "Logistique", theme: "Conformité réglementaire",
-    statut: "en_cours", site: "Tanger Med", demandeur: "Anas Benali", dateCreation: "2026-03-13",
+    statut: "enCours", site: "Tanger Med", demandeur: "Anas Benali", dateCreation: "2026-03-13",
     validateurs: [{ name: "Direction Qualité", ordre: 1, valide: true }, { name: "Direction Logistique", ordre: 2, valide: true }],
     sousActions: [
       { id: "sa-1", libelle: "Communiquer la nouvelle version aux équipes", respRealisation: "Mehdi Cherkaoui", respSuivi: "Anas Benali", delai: "2026-04-01", tauxRealisation: 100, tauxEfficacite: 90, gravite: "Modérée", priorite: "Haute" },
@@ -55,7 +55,7 @@ export const actions: ActionRecord[] = [
     type: "Action préventive", source: "Indicateur",
     description: "Balance B-204 hors période d'étalonnage selon le plan métrologique.",
     causes: ["Matériel"], directionPilote: "Direction Logistique", metier: "Logistique", theme: "Conformité réglementaire",
-    statut: "validation", site: "Marrakech", demandeur: "Yassine Benjelloun", dateCreation: "2026-04-22",
+    statut: "enAttente", site: "Marrakech", demandeur: "Yassine Benjelloun", dateCreation: "2026-04-22",
     validateurs: [{ name: "Direction Qualité", ordre: 1, valide: true }, { name: "DRH", ordre: 2 }],
     sousActions: [
       { id: "sa-4", libelle: "Contacter prestataire d'étalonnage", respRealisation: "Yassine Benjelloun", respSuivi: "Anas Benali", delai: "2026-05-05", tauxRealisation: 30, tauxEfficacite: 0, gravite: "Forte", priorite: "Urgente" },
@@ -78,7 +78,7 @@ export const actions: ActionRecord[] = [
     type: "Action préventive", source: "Risque AMDEC",
     description: "Habilitations ADR de 4 chauffeurs expirent dans <90 jours.",
     causes: ["Main d'œuvre"], directionPilote: "DRH", metier: "Conduite", theme: "Sécurité au travail",
-    statut: "demande", site: "Tanger Med", demandeur: "Mehdi Cherkaoui", dateCreation: "2026-04-28",
+    statut: "enAttente", site: "Tanger Med", demandeur: "Mehdi Cherkaoui", dateCreation: "2026-04-28",
     validateurs: [{ name: "DRH", ordre: 1 }, { name: "Direction Logistique", ordre: 2 }],
     sousActions: [],
   },
@@ -99,10 +99,10 @@ export const actions: ActionRecord[] = [
 ];
 
 export const actionStatutMap: Record<ActionStatut, { label: string; status: "info" | "conforme" | "surveillance" | "critique" }> = {
-  demande: { label: "Demande", status: "info" },
-  validation: { label: "En validation", status: "surveillance" },
+  enAttente: { label: "En attente", status: "info" },
+  validee: { label: "Validée", status: "surveillance" },
   refusee: { label: "Refusée", status: "critique" },
-  en_cours: { label: "En cours", status: "surveillance" },
+  enCours: { label: "En cours", status: "surveillance" },
   realisee: { label: "Réalisée", status: "conforme" },
   evaluee: { label: "Évaluée", status: "conforme" },
   cloturee: { label: "Clôturée", status: "conforme" },

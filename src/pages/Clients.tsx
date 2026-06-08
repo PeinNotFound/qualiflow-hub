@@ -6,11 +6,57 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/qh/StatusBadge";
 import { ParamCard, KPICard } from "@/components/qh/ParamCard";
-import { Users, Plus, Sparkles, MessageSquare, ClipboardList, Lightbulb, Star } from "lucide-react";
+import { Users, Plus, Sparkles, MessageSquare, ClipboardList, Lightbulb, Star, Loader2 } from "lucide-react";
 import { clients, reclamationsClient, enquetesSatisfaction, suggestionsClient, typesClient, categoriesClient, regionsClient, typesReclamation, gravitesReclamation, typesDecision, typesSuggestion } from "@/lib/mock-data-extended";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input as InputField } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { get, post } from "@/lib/api";
+import { useState, useEffect } from "react";
 
 export default function Clients() {
-  const satMoy = (clients.reduce((s, c) => s + c.satisfaction, 0) / clients.length).toFixed(1);
+  const [items, setItems] = useState<any[]>(clients);
+  const [loading, setLoading] = useState(true);
+  const [openNew, setOpenNew] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const fetchClients = async () => {
+    try {
+      const data: any = await get("/api/clients");
+      setItems(data.data.length > 0 ? data.data : clients);
+    } catch (error) {
+      console.error("Failed to fetch clients", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      await post("/api/clients", payload);
+      toast.success("Client créé avec succès");
+      setOpenNew(false);
+      fetchClients();
+    } catch (error) {
+      toast.error("Erreur lors de la création du client");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const satMoy = (items.reduce((s, c) => s + (c.satisfaction || 0), 0) / (items.length || 1)).toFixed(1);
+  
   return (
     <div>
       <PageHeader
@@ -18,11 +64,68 @@ export default function Clients() {
         title="Clients & Parties Intéressées"
         description="Réclamations, satisfaction, suggestions clients (ISO 9.1.2)"
         iso="9.1.2"
-        actions={<><Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> Sentiment IA</Badge><Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouveau client</Button></>}
+        actions={
+          <>
+            <Dialog open={openNew} onOpenChange={setOpenNew}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouveau client</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Ajouter un nouveau client</DialogTitle>
+                  <DialogDescription>Renseignez les informations de base du client.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreate}>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-1">
+                      <Label>Raison sociale</Label>
+                      <InputField name="raisonSociale" placeholder="Ex: OCP Group" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label>Code</Label>
+                        <InputField name="code" placeholder="Ex: CLT-052" required />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Type</Label>
+                        <Select name="type">
+                          <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                          <SelectContent>{typesClient.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label>Région</Label>
+                        <Select name="region">
+                          <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                          <SelectContent>{regionsClient.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Catégorie</Label>
+                        <Select name="categorie">
+                          <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                          <SelectContent>{categoriesClient.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Enregistrer
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
       />
 
       <div className="grid gap-3 md:grid-cols-4 mb-4">
-        <KPICard title="Clients" value={clients.length} />
+        <KPICard title="Clients" value={items.length} />
         <KPICard title="Satisfaction moy." value={`${satMoy}/5`} icon={<Star className="h-4 w-4 text-warning" />} />
         <KPICard title="Réclamations" value={reclamationsClient.length} icon={<MessageSquare className="h-4 w-4" />} />
         <KPICard title="Enquêtes actives" value={enquetesSatisfaction.length} icon={<ClipboardList className="h-4 w-4" />} />
@@ -38,22 +141,28 @@ export default function Clients() {
         </TabsList>
 
         <TabsContent value="clients" className="mt-4">
-          <Card><CardContent className="p-0"><Table>
-            <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Raison sociale</TableHead><TableHead>Type</TableHead><TableHead>Catégorie</TableHead><TableHead>Région</TableHead><TableHead>CA</TableHead><TableHead>Satisfaction</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {clients.map(c => (
-                <TableRow key={c.code}>
-                  <TableCell className="font-mono text-xs">{c.code}</TableCell>
-                  <TableCell><div className="font-medium">{c.raisonSociale}</div><div className="text-xs text-muted-foreground">{c.email}</div></TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{c.type}</Badge></TableCell>
-                  <TableCell className="text-xs">{c.categorie}</TableCell>
-                  <TableCell className="text-xs">{c.region}</TableCell>
-                  <TableCell className="text-xs">{c.ca.toLocaleString()} MAD</TableCell>
-                  <TableCell><StatusBadge status={c.satisfaction >= 4 ? "conforme" : c.satisfaction >= 3 ? "surveillance" : "critique"} label={`${c.satisfaction}/5`} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table></CardContent></Card>
+          <Card><CardContent className="p-0">
+            {loading ? (
+              <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+            ) : (
+              <Table>
+                <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Raison sociale</TableHead><TableHead>Type</TableHead><TableHead>Catégorie</TableHead><TableHead>Région</TableHead><TableHead>CA</TableHead><TableHead>Satisfaction</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {items.map(c => (
+                    <TableRow key={c.code}>
+                      <TableCell className="font-mono text-xs">{c.code}</TableCell>
+                      <TableCell><div className="font-medium">{c.raisonSociale}</div><div className="text-xs text-muted-foreground">{c.email}</div></TableCell>
+                      <TableCell><Badge variant="outline" className="text-[10px]">{c.type}</Badge></TableCell>
+                      <TableCell className="text-xs">{c.categorie}</TableCell>
+                      <TableCell className="text-xs">{c.region}</TableCell>
+                      <TableCell className="text-xs">{c.ca?.toLocaleString()} MAD</TableCell>
+                      <TableCell><StatusBadge status={(c.satisfaction || 0) >= 4 ? "conforme" : (c.satisfaction || 0) >= 3 ? "surveillance" : "critique"} label={`${c.satisfaction || 0}/5`} /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent></Card>
         </TabsContent>
 
         <TabsContent value="reclamations" className="mt-4 space-y-2">

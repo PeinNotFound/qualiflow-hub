@@ -1,6 +1,16 @@
 import mongoose from "mongoose";
 
-const USER_ROLES = ["admin", "pilot", "auditor", "operator"];
+const USER_ROLES = [
+  "superadmin",
+  "admin",
+  "pilot",
+  "copilot",
+  "supervisor",
+  "auditor",
+  "quality_assistant",
+  "director",
+  "operator"
+];
 
 const userSchema = new mongoose.Schema(
   {

@@ -5,6 +5,7 @@ import NC from "../../models/NC.js";
 import ActionService from "../../services/ActionService.js";
 import ReferenceGenerator from "../../utils/ReferenceGenerator.js";
 import ApiError from "../../utils/ApiError.js";
+import Notification from "../../models/Notification.js";
 
 export const createAudit = async (req, res, next) => {
   try {
@@ -22,6 +23,18 @@ export const createAudit = async (req, res, next) => {
       audites,
       etat: "nonRealise",
     });
+
+    // Notify auditors
+    if (auditeurs && auditeurs.length > 0) {
+      for (const auditorId of auditeurs) {
+        await Notification.notify(auditorId, {
+          type: "info",
+          module: "Audit",
+          message: `Vous avez été assigné à l'audit ${reference}`,
+          link: "/audits"
+        });
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -80,6 +93,14 @@ export const addConstatEcart = async (req, res, next) => {
       await constat.save();
 
       audit.nc_ids.push(nc._id);
+
+      // Notify detector
+      await Notification.notify(req.user.id, {
+        type: "error",
+        module: "Audit",
+        message: `PNC générée automatiquement pour l'audit ${audit.reference}`,
+        link: "/non-conformites"
+      });
     }
 
     await audit.save();

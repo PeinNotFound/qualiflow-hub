@@ -18,7 +18,7 @@ export default function Reunions() {
         icon={<CalIcon className="h-5 w-5" />}
         title="Réunions"
         description="Planification, ordre du jour, décisions et actions associées"
-        actions={<><Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> PV auto IA</Badge><Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouvelle réunion</Button></>}
+        actions={<Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouvelle réunion</Button>}
       />
 
       <div className="grid gap-3 md:grid-cols-3 mb-4">

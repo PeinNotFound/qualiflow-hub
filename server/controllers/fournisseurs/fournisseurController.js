@@ -47,3 +47,15 @@ export const createEvaluation = async (req, res, next) => {
     next(error);
   }
 };
+
+export const createFournisseur = async (req, res, next) => {
+  try {
+    const fournisseur = await Fournisseur.create(req.body);
+    res.status(201).json({
+      success: true,
+      data: fournisseur,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

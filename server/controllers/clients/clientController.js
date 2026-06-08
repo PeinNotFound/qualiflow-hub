@@ -1,3 +1,4 @@
+import Client from "../../models/Client.js";
 import ReclamationClient from "../../models/ReclamationClient.js";
 import PNCFiche from "../../models/PNCFiche.js";
 import ActionService from "../../services/ActionService.js";
@@ -48,6 +49,30 @@ export const getReclamations = async (req, res, next) => {
     res.json({
       success: true,
       data: reclamations,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getClients = async (req, res, next) => {
+  try {
+    const clients = await Client.find();
+    res.json({
+      success: true,
+      data: clients,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createClient = async (req, res, next) => {
+  try {
+    const client = await Client.create(req.body);
+    res.status(201).json({
+      success: true,
+      data: client,
     });
   } catch (error) {
     next(error);

@@ -2,6 +2,7 @@ import NC from "../../models/NC.js";
 import ActionService from "../../services/ActionService.js";
 import ReferenceGenerator from "../../utils/ReferenceGenerator.js";
 import ApiError from "../../utils/ApiError.js";
+import Notification from "../../models/Notification.js";
 
 export const createNC = async (req, res, next) => {
   try {
@@ -35,6 +36,14 @@ export const createNC = async (req, res, next) => {
       nc.actions.push(action._id);
       await nc.save();
     }
+
+    // Trigger Notification
+    await Notification.notify(req.user.id, {
+      type: "warning",
+      module: "NC",
+      message: `Nouvelle Non-Conformité déclarée : ${reference}`,
+      link: "/non-conformites"
+    });
 
     res.status(201).json({
       success: true,
