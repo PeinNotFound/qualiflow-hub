@@ -71,7 +71,7 @@ export default function RH() {
         title="Ressources Humaines"
         description="Compétences, formation, habilitations dynamiques (ISO 7.1.2)"
         iso="7.1.2"
-        actions={<Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> Suggestions IA</Badge>}
+        actions={<Button size="sm" onClick={() => {}}><Plus className="h-4 w-4 mr-1.5" />Nouvel employé</Button>}
       />
 
       <Tabs defaultValue="employes">
@@ -252,7 +252,7 @@ export default function RH() {
           <Card className="border-warning/30 bg-warning/5">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-warning" /> Alertes d'expiration ({expirations.length})</CardTitle>
-              <CardDescription>L'IA suggère un plan de renouvellement automatique</CardDescription>
+              <CardDescription>Alertes de renouvellement des habilitations périodiques</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {expirations.map(x => (
@@ -367,7 +367,7 @@ function EmployeeDialog({ onSubmit }: { onSubmit: (d: Partial<Employee>) => void
     <DialogContent className="max-w-2xl">
       <DialogHeader>
         <DialogTitle>Nouvelle fiche employé</DialogTitle>
-        <DialogDescription>Remplissez les informations — l'IA suggère un profil de fonction adapté.</DialogDescription>
+        <DialogDescription>Remplissez les informations de la fiche employé.</DialogDescription>
       </DialogHeader>
       <div className="grid gap-3 md:grid-cols-2">
         <div><Label>Matricule</Label><Input onChange={e => setData({ ...data, matricule: e.target.value })} placeholder="MSL-XXXX" /></div>

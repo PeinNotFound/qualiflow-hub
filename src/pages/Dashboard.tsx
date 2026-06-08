@@ -34,10 +34,9 @@ export default function Dashboard() {
       <PageHeader
         icon={<LayoutDashboard className="h-5 w-5" />}
         title="Tableau de bord Direction"
-        description="Indice de santé globale du SMQ — analyse temps réel propulsée par l'IA"
+        description="Indice de santé globale du SMQ — analyse temps réel de la performance"
         actions={
           <>
-            <Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> IA active</Badge>
             <Button variant="outline" size="sm">Exporter le rapport</Button>
           </>
         }

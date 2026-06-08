@@ -8,10 +8,7 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
-    config.headers = {
-      ...config.headers,
-      Authorization: `Bearer ${token}`,
-    };
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -21,7 +18,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Nettoyer le storage et rediriger vers la page d'auth
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/auth';
@@ -30,4 +26,10 @@ api.interceptors.response.use(
   }
 );
 
+export const get = <T>(url: string) => api.get<T>(url).then(r => r.data);
+export const post = <T>(url: string, data: any) => api.post<T>(url, data).then(r => r.data);
+export const patch = <T>(url: string, data: any) => api.patch<T>(url, data).then(r => r.data);
+export const del = <T>(url: string) => api.delete<T>(url).then(r => r.data);
+
 export default api;
+

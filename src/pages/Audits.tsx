@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/qh/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/qh/StatusBadge";
-import { ClipboardCheck, Plus, Settings2, Sparkles, FileText, Users, AlertTriangle, CheckCircle2, ShieldAlert, MapPin, Clock, Send } from "lucide-react";
+import { ClipboardCheck, Plus, Settings2, Sparkles, FileText, Users, AlertTriangle, CheckCircle2, ShieldAlert, MapPin, Clock, Send, Loader2 } from "lucide-react";
 import {
-  audits as initialAudits, champsAudit, typesAudit, typesEcart, gravites, auditeursExternes,
-  employees, type Audit, type AuditStatut, graviteColor,
+  champsAudit, typesAudit, typesEcart, gravites, auditeursExternes,
+  employees, type Audit, type AuditStatut, graviteColor, audits as initialAudits,
 } from "@/lib/mock-data";
+import { get, post } from "@/lib/api";
 import { toast } from "sonner";
 
 const statutAudit: Record<AuditStatut, { label: string; status: "info" | "conforme" | "surveillance" | "critique" }> = {
@@ -27,27 +28,47 @@ const statutAudit: Record<AuditStatut, { label: string; status: "info" | "confor
 };
 
 export default function Audits() {
-  const [audits, setAudits] = useState<Audit[]>(initialAudits);
+  const [audits, setAudits] = useState<Audit[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Audit | null>(null);
   const [openNew, setOpenNew] = useState(false);
 
+  useEffect(() => {
+    fetchAudits();
+  }, []);
+
+  const fetchAudits = async () => {
+    try {
+      const data: any = await get("/api/audits");
+      setAudits(data.data);
+      if (data.data.length > 0 && !selected) {
+        setSelected(data.data[0]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch audits", error);
+      toast.error("Erreur lors du chargement des audits");
+      setAudits(initialAudits);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const auditeursInternes = employees.filter(e => e.isAuditor).map(e => e.fullName);
-  const totalEcarts = audits.reduce((s, a) => s + a.ecarts.length, 0);
-  const ecartsCritiques = audits.flatMap(a => a.ecarts).filter(e => e.gravite === 3).length;
+  const totalEcarts = audits.reduce((s, a) => s + (a.ecarts?.length || 0), 0);
+  const ecartsCritiques = audits.flatMap(a => a.ecarts || []).filter(e => e.gravite === 3).length;
 
   return (
     <div>
       <PageHeader
         icon={<ClipboardCheck className="h-5 w-5" />}
         title="Audits"
-        description="Planification, check-lists IA, rapports automatiques (ISO 9.2)"
+        description="Planification, rapports automatiques et suivi des écarts (ISO 9.2)"
         iso="9.2"
         actions={
           <>
-            <Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> Check-list IA</Badge>
             <Dialog open={openNew} onOpenChange={setOpenNew}>
               <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Planifier un audit</Button></DialogTrigger>
-              <NewAuditDialog onSubmit={() => { toast.success("Audit planifié — alertes envoyées aux auditeurs et audités"); setOpenNew(false); }} />
+              <NewAuditDialog onSuccess={() => { setOpenNew(false); fetchAudits(); }} />
             </Dialog>
           </>
         }
@@ -68,36 +89,40 @@ export default function Audits() {
         </TabsList>
 
         <TabsContent value="audits" className="mt-4">
-          <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,1.5fr)]">
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm">Liste des audits</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                {audits.map(a => {
-                  const s = statutAudit[a.statut];
-                  return (
-                    <button key={a.id} onClick={() => setSelected(a)} className={`w-full text-left p-3 rounded-lg border transition-base ${selected?.id === a.id ? "bg-primary/8 border-primary/30" : "hover:bg-muted/40"}`}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{a.reference}</span>
-                        <StatusBadge status={s.status} label={s.label} />
-                      </div>
-                      <div className="font-medium text-sm mt-1">{a.champ}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{a.type} · {a.dateDebut} → {a.dateFin}</div>
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
-                        <span><Users className="h-3 w-3 inline mr-1" />{a.auditeurs.length} auditeur(s)</span>
-                        {a.ecarts.length > 0 && <span className="text-warning"><AlertTriangle className="h-3 w-3 inline mr-1" />{a.ecarts.length} écart(s)</span>}
-                      </div>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[1fr_minmax(0,1.5fr)]">
+              <Card>
+                <CardHeader className="pb-3"><CardTitle className="text-sm">Liste des audits</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  {audits.map(a => {
+                    const s = statutAudit[a.statut] || { label: a.statut, status: "info" };
+                    return (
+                      <button key={a.id || a.reference} onClick={() => setSelected(a)} className={`w-full text-left p-3 rounded-lg border transition-base ${selected?.id === a.id || selected?.reference === a.reference ? "bg-primary/8 border-primary/30" : "hover:bg-muted/40"}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded">{a.reference}</span>
+                          <StatusBadge status={s.status} label={s.label} />
+                        </div>
+                        <div className="font-medium text-sm mt-1">{a.champ}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{a.type} · {a.dateDebut} → {a.dateFin}</div>
+                        <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                          <span><Users className="h-3 w-3 inline mr-1" />{a.auditeurs?.length || 0} auditeur(s)</span>
+                          {a.ecarts && a.ecarts.length > 0 && <span className="text-warning"><AlertTriangle className="h-3 w-3 inline mr-1" />{a.ecarts.length} écart(s)</span>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </CardContent>
+              </Card>
 
-            <div className="min-w-0">
-              {selected ? <AuditDetail audit={selected} /> : (
-                <Card><CardContent className="pt-12 pb-12 text-center text-muted-foreground"><ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Sélectionnez un audit pour voir le détail.</p></CardContent></Card>
-              )}
+              <div className="min-w-0">
+                {selected ? <AuditDetail audit={selected} /> : (
+                  <Card><CardContent className="pt-12 pb-12 text-center text-muted-foreground"><ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Sélectionnez un audit pour voir le détail.</p></CardContent></Card>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </TabsContent>
 
         <TabsContent value="ecarts" className="mt-4">
@@ -107,7 +132,7 @@ export default function Audits() {
               <Table>
                 <TableHeader><TableRow><TableHead>Audit</TableHead><TableHead>Concerné</TableHead><TableHead>Type</TableHead><TableHead>Gravité</TableHead><TableHead>Description</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {audits.flatMap(a => a.ecarts.map(e => (
+                  {audits.flatMap(a => (a.ecarts || []).map(e => (
                     <TableRow key={e.id}>
                       <TableCell className="font-mono text-xs">{a.reference}</TableCell>
                       <TableCell>{e.concerne}</TableCell>
@@ -139,7 +164,7 @@ export default function Audits() {
 }
 
 function AuditDetail({ audit }: { audit: Audit }) {
-  const s = statutAudit[audit.statut];
+  const s = statutAudit[audit.statut] || { label: audit.statut, status: "info" };
   return (
     <div className="space-y-4">
       <Card>
@@ -158,9 +183,9 @@ function AuditDetail({ audit }: { audit: Audit }) {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2 text-sm">
-            <div><div className="text-[11px] uppercase text-muted-foreground">Auditeurs</div><div className="flex gap-1 flex-wrap mt-1">{audit.auditeurs.map(a => <Badge key={a} variant="secondary" className="text-[10px]">{a}</Badge>)}</div></div>
-            <div><div className="text-[11px] uppercase text-muted-foreground">Audités</div><div className="flex gap-1 flex-wrap mt-1">{audit.audites.map(a => <Badge key={a} variant="outline" className="text-[10px]">{a}</Badge>)}</div></div>
-            <div className="md:col-span-2"><div className="text-[11px] uppercase text-muted-foreground">Documents de référence</div><div className="flex gap-1 flex-wrap mt-1">{audit.documentsRef.map(d => <Badge key={d} variant="outline" className="text-[10px] font-mono">{d}</Badge>)}</div></div>
+            <div><div className="text-[11px] uppercase text-muted-foreground">Auditeurs</div><div className="flex gap-1 flex-wrap mt-1">{audit.auditeurs?.map(a => <Badge key={a} variant="secondary" className="text-[10px]">{a}</Badge>)}</div></div>
+            <div><div className="text-[11px] uppercase text-muted-foreground">Audités</div><div className="flex gap-1 flex-wrap mt-1">{audit.audites?.map(a => <Badge key={a} variant="outline" className="text-[10px]">{a}</Badge>)}</div></div>
+            <div className="md:col-span-2"><div className="text-[11px] uppercase text-muted-foreground">Documents de référence</div><div className="flex gap-1 flex-wrap mt-1">{audit.documentsRef?.map(d => <Badge key={d} variant="outline" className="text-[10px] font-mono">{d}</Badge>)}</div></div>
           </div>
           {audit.statut === "rapport" && (
             <div className="mt-4 flex gap-2">
@@ -174,7 +199,7 @@ function AuditDetail({ audit }: { audit: Audit }) {
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><Clock className="h-4 w-4" />Plan d'audit</CardTitle></CardHeader>
         <CardContent>
-          {audit.plan.length === 0 ? <p className="text-sm text-muted-foreground">Plan d'audit non encore élaboré.</p> : (
+          {!audit.plan || audit.plan.length === 0 ? <p className="text-sm text-muted-foreground">Plan d'audit non encore élaboré.</p> : (
             <div className="space-y-2">
               {audit.plan.map((p, i) => (
                 <div key={i} className="border rounded-lg p-3">
@@ -186,8 +211,8 @@ function AuditDetail({ audit }: { audit: Audit }) {
                     <Badge variant="outline" className="text-[10px]">{p.date} · {p.debut}–{p.fin}</Badge>
                   </div>
                   <div className="mt-2 flex gap-3 text-xs">
-                    <span className="text-muted-foreground">Auditeurs: <span className="text-foreground">{p.auditeurs.join(", ")}</span></span>
-                    <span className="text-muted-foreground">À rencontrer: <span className="text-foreground">{p.aRencontrer.join(", ")}</span></span>
+                    <span className="text-muted-foreground">Auditeurs: <span className="text-foreground">{p.auditeurs?.join(", ")}</span></span>
+                    <span className="text-muted-foreground">À rencontrer: <span className="text-foreground">{p.aRencontrer?.join(", ")}</span></span>
                   </div>
                 </div>
               ))}
@@ -196,7 +221,7 @@ function AuditDetail({ audit }: { audit: Audit }) {
         </CardContent>
       </Card>
 
-      {audit.ecarts.length > 0 && (
+      {audit.ecarts && audit.ecarts.length > 0 && (
         <Card className="border-warning/30 bg-warning/5">
           <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-warning" />Écarts ({audit.ecarts.length})</CardTitle></CardHeader>
           <CardContent className="space-y-2">
@@ -219,34 +244,49 @@ function AuditDetail({ audit }: { audit: Audit }) {
         </Card>
       )}
 
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" />Check-list IA suggérée</CardTitle><CardDescription>Générée à partir des documents de référence et de l'historique d'écarts</CardDescription></CardHeader>
-        <CardContent>
-          <ul className="space-y-1.5 text-sm">
-            <li>✓ Vérifier que la version en vigueur de chaque procédure est utilisée sur le terrain</li>
-            <li>✓ Contrôler la traçabilité des bons de livraison sur 10 dossiers échantillonnés</li>
-            <li>✓ Évaluer la connaissance des procédures par 3 opérateurs aléatoires</li>
-            <li>✓ Vérifier la conformité des habilitations (ADR, CACES) au regard des fiches employés</li>
-          </ul>
-        </CardContent>
-      </Card>
     </div>
   );
 }
 
-function NewAuditDialog({ onSubmit }: { onSubmit: () => void }) {
+function NewAuditDialog({ onSuccess }: { onSuccess: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      await post("/api/audits", payload);
+      toast.success("Audit planifié — alertes envoyées aux auditeurs et audités");
+      onSuccess();
+    } catch (error) {
+      toast.error("Erreur lors de la planification de l'audit");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <DialogContent className="max-w-2xl">
-      <DialogHeader><DialogTitle>Planifier un nouvel audit</DialogTitle><DialogDescription>L'IA suggère automatiquement un plan basé sur le champ et le type choisis.</DialogDescription></DialogHeader>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div><Label>Référence</Label><Input placeholder="AUD-2026-XXX" /></div>
-        <div><Label>Type</Label><Select><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{typesAudit.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select></div>
-        <div className="md:col-span-2"><Label>Champ d'audit</Label><Select><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{champsAudit.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
-        <div><Label>Date début</Label><Input type="date" /></div>
-        <div><Label>Date fin</Label><Input type="date" /></div>
-        <div className="md:col-span-2"><Label>Objectifs</Label><Textarea rows={3} placeholder="Décrire les objectifs de l'audit…" /></div>
-      </div>
-      <DialogFooter><Button onClick={onSubmit}>Planifier</Button></DialogFooter>
+      <DialogHeader><DialogTitle>Planifier un nouvel audit</DialogTitle><DialogDescription>Renseignez les détails de la mission d'audit.</DialogDescription></DialogHeader>
+      <form onSubmit={handleSubmit}>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div><Label>Référence</Label><Input name="reference" placeholder="AUD-2026-XXX" /></div>
+          <div><Label>Type</Label><Select name="type"><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{typesAudit.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select></div>
+          <div className="md:col-span-2"><Label>Champ d'audit</Label><Select name="champ"><SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger><SelectContent>{champsAudit.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label>Date début</Label><Input name="dateDebut" type="date" required /></div>
+          <div><Label>Date fin</Label><Input name="dateFin" type="date" required /></div>
+          <div className="md:col-span-2"><Label>Objectifs</Label><Textarea name="objectifs" rows={3} placeholder="Décrire les objectifs de l'audit…" /></div>
+        </div>
+        <DialogFooter className="mt-4">
+          <Button type="submit" disabled={submitting}>
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Planifier
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   );
 }
@@ -266,3 +306,4 @@ function ParamCard({ title, items, note }: { title: string; items: string[]; not
       <CardContent><ul className="space-y-1 text-sm">{items.map(i => <li key={i} className="px-2 py-1 rounded hover:bg-muted/50">• {i}</li>)}</ul></CardContent></Card>
   );
 }
+

@@ -6,12 +6,57 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/qh/StatusBadge";
 import { ParamCard, KPICard } from "@/components/qh/ParamCard";
-import { Truck, Plus, Sparkles, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
+import { Truck, Plus, Sparkles, TrendingUp, TrendingDown, Minus, AlertTriangle, Loader2 } from "lucide-react";
 import { fournisseurs, reclamationsFournisseur, categoriesFournisseur, typesProduit, criteresFournisseur, gravitesReclFournisseur } from "@/lib/mock-data-extended";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input as InputField } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { get, post } from "@/lib/api";
+import { useState, useEffect } from "react";
 
 export default function Fournisseurs() {
-  const moyenne = Math.round(fournisseurs.reduce((s, f) => s + f.scoreGlobal, 0) / fournisseurs.length);
-  const agrees = fournisseurs.filter(f => f.agree).length;
+  const [items, setItems] = useState<any[]>(fournisseurs);
+  const [loading, setLoading] = useState(true);
+  const [openNew, setOpenNew] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetchFournisseurs();
+  }, []);
+
+  const fetchFournisseurs = async () => {
+    try {
+      const data: any = await get("/api/fournisseurs");
+      setItems(data.data.length > 0 ? data.data : fournisseurs);
+    } catch (error) {
+      console.error("Failed to fetch fournisseurs", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      await post("/api/fournisseurs", payload);
+      toast.success("Fournisseur créé avec succès");
+      setOpenNew(false);
+      fetchFournisseurs();
+    } catch (error) {
+      toast.error("Erreur lors de la création du fournisseur");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const moyenne = Math.round(items.reduce((s, f) => s + (f.scoreGlobal || 0), 0) / (items.length || 1));
+  const agrees = items.filter(f => f.agree).length;
 
   return (
     <div>
@@ -20,11 +65,52 @@ export default function Fournisseurs() {
         title="Fournisseurs"
         description="Évaluation, sélection prédictive et veille des contrats (ISO 8.4)"
         iso="8.4"
-        actions={<><Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> IA Sélection</Badge><Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouveau fournisseur</Button></>}
+        actions={
+          <>
+            <Dialog open={openNew} onOpenChange={setOpenNew}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Nouveau fournisseur</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Ajouter un fournisseur</DialogTitle>
+                  <DialogDescription>Renseignez les détails du nouveau fournisseur.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreate}>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-1">
+                      <Label>Raison sociale</Label>
+                      <InputField name="raisonSociale" placeholder="Ex: Sony Group" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label>Code</Label>
+                        <InputField name="code" placeholder="Ex: FR-012" required />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Catégorie</Label>
+                        <Select name="categorie">
+                          <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                          <SelectContent>{categoriesFournisseur.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Enregistrer
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
       />
 
       <div className="grid gap-3 md:grid-cols-4 mb-4">
-        <KPICard title="Total" value={fournisseurs.length} />
+        <KPICard title="Total" value={items.length} />
         <KPICard title="Agréés" value={agrees} />
         <KPICard title="Score moyen" value={`${moyenne}/100`} />
         <KPICard title="Réclamations" value={reclamationsFournisseur.length} icon={<AlertTriangle className="h-4 w-4 text-warning" />} />
@@ -39,23 +125,29 @@ export default function Fournisseurs() {
         </TabsList>
 
         <TabsContent value="liste" className="mt-4">
-          <Card><CardContent className="p-0"><Table>
-            <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Raison sociale</TableHead><TableHead>Catégorie</TableHead><TableHead>Types produits</TableHead><TableHead>Agréé</TableHead><TableHead>Score</TableHead><TableHead>Tendance</TableHead><TableHead>Réclamations</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {fournisseurs.map(f => (
-                <TableRow key={f.code}>
-                  <TableCell className="font-mono text-xs">{f.code}</TableCell>
-                  <TableCell><div className="font-medium">{f.raisonSociale}</div><div className="text-xs text-muted-foreground">Éval. {f.derniereEval}</div></TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{f.categorie}</Badge></TableCell>
-                  <TableCell className="text-xs">{f.types.join(", ")}</TableCell>
-                  <TableCell>{f.agree ? <Badge variant="default" className="text-[10px]">Oui</Badge> : <Badge variant="destructive" className="text-[10px]">Non</Badge>}</TableCell>
-                  <TableCell><StatusBadge status={f.scoreGlobal >= 75 ? "conforme" : f.scoreGlobal >= 60 ? "surveillance" : "critique"} label={`${f.scoreGlobal}/100`} /></TableCell>
-                  <TableCell>{f.tendance === "up" ? <TrendingUp className="h-4 w-4 text-success" /> : f.tendance === "down" ? <TrendingDown className="h-4 w-4 text-destructive" /> : <Minus className="h-4 w-4 text-muted-foreground" />}</TableCell>
-                  <TableCell className="text-sm">{f.reclamations}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table></CardContent></Card>
+          <Card><CardContent className="p-0">
+            {loading ? (
+              <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+            ) : (
+              <Table>
+                <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Raison sociale</TableHead><TableHead>Catégorie</TableHead><TableHead>Types produits</TableHead><TableHead>Agréé</TableHead><TableHead>Score</TableHead><TableHead>Tendance</TableHead><TableHead>Réclamations</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {items.map(f => (
+                    <TableRow key={f.code}>
+                      <TableCell className="font-mono text-xs">{f.code}</TableCell>
+                      <TableCell><div className="font-medium">{f.raisonSociale}</div><div className="text-xs text-muted-foreground">Éval. {f.derniereEval || "Non evalué"}</div></TableCell>
+                      <TableCell><Badge variant="outline" className="text-[10px]">{f.categorie}</Badge></TableCell>
+                      <TableCell className="text-xs">{f.types?.join(", ") || "-"}</TableCell>
+                      <TableCell>{f.agree ? <Badge variant="default" className="text-[10px]">Oui</Badge> : <Badge variant="destructive" className="text-[10px]">Non</Badge>}</TableCell>
+                      <TableCell><StatusBadge status={(f.scoreGlobal || 0) >= 75 ? "conforme" : (f.scoreGlobal || 0) >= 60 ? "surveillance" : "critique"} label={`${f.scoreGlobal || 0}/100`} /></TableCell>
+                      <TableCell>{f.tendance === "up" ? <TrendingUp className="h-4 w-4 text-success" /> : f.tendance === "down" ? <TrendingDown className="h-4 w-4 text-destructive" /> : <Minus className="h-4 w-4 text-muted-foreground" />}</TableCell>
+                      <TableCell className="text-sm">{f.reclamations || 0}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent></Card>
         </TabsContent>
 
         <TabsContent value="evaluations" className="mt-4">

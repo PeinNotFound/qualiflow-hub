@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import api from "@/lib/api";
 
-export type AppRole = "admin" | "pilote" | "auditeur" | "operateur";
+export type AppRole = "superadmin" | "admin" | "pilot" | "copilot" | "supervisor" | "auditor" | "quality_assistant" | "director" | "operator";
 
 export interface User {
   id: string;
@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const token = localStorage.getItem("token");
       if (token) {
         try {
-          const response = await api.get("/auth/me");
+          const response = await api.get("/api/auth/me");
           const { user: currentUser, roles: currentRoles } = response.data;
           setUser(currentUser);
           setRoles(currentRoles || []);
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const response = await api.post("/auth/login", { email, password });
+    const response = await api.post("/api/auth/login", { email, password });
     const { token, user: loggedUser, roles: userRoles } = response.data;
 
     // Stocker le token et l'utilisateur de manière cohérente
@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Option A : après inscription, l'utilisateur doit se connecter manuellement
   const signUp = async (email: string, password: string, fullName: string) => {
-    await api.post("/auth/register", { email, password, full_name: fullName });
+    await api.post("/api/auth/register", { email, password, full_name: fullName });
   };
 
   const signOut = () => {

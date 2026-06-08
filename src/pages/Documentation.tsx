@@ -33,20 +33,33 @@ const cycleSteps: { id: DocStatus; label: string; actor: string }[] = [
 
 const docStatusToBadge = (s: DocStatus) => s === "vigueur" ? "conforme" : s === "perime" ? "critique" : "surveillance";
 
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { get, post } from "@/lib/api";
+
 export default function Documentation() {
   const [selected, setSelected] = useState(processes[1]);
   const [chatQ, setChatQ] = useState("");
   const [chatA, setChatA] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openNew, setOpenNew] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const askAI = async () => {
-    if (!chatQ.trim()) return;
-    setBusy(true); setChatA("");
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(formData.entries());
+
     try {
-      const { data, error } = await supabase.functions.invoke("chat-with-doc", { body: { question: chatQ, processName: selected.name } });
-      if (error) throw error;
-      setChatA(data?.answer ?? "Aucune réponse.");
-    } catch (e: any) { toast.error(e.message ?? "Erreur IA"); } finally { setBusy(false); }
+      await post("/api/documentation", payload);
+      toast.success("Document créé avec succès");
+      setOpenNew(false);
+      // fetch documents would go here if we were listing real ones
+    } catch (error) {
+      toast.error("Erreur lors de la création du document");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -56,10 +69,66 @@ export default function Documentation() {
         title="Documentation (GED)"
         description="Database centrale du SMQ — Modèle des 5 Axes propulsé par l'IA"
         iso="7.5"
-        actions={<>
-          <Badge variant="secondary" className="gap-1.5"><Sparkles className="h-3 w-3" /> IA Bibliothécaire</Badge>
-          <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> Nouveau document</Button>
-        </>}
+        actions={
+          <>
+            <Dialog open={openNew} onOpenChange={setOpenNew}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1.5" /> Nouveau document</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Ajouter un document</DialogTitle>
+                  <DialogDescription>Enregistrez un nouveau document dans la GED.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreate}>
+                  <div className="grid gap-3 py-4">
+                    <div className="space-y-1">
+                      <Label>Libellé du document</Label>
+                      <Input name="libelle" placeholder="Ex: Procédure d'audit interne" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label>Type</Label>
+                        <Select name="type" defaultValue="procedure">
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="manuel">Manuel</SelectItem>
+                            <SelectItem value="procedure">Procédure</SelectItem>
+                            <SelectItem value="instruction">Instruction</SelectItem>
+                            <SelectItem value="enregistrement">Enregistrement</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Axe (1-5)</Label>
+                        <Select name="axe_number" defaultValue="3">
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">Axe 1 - Identité</SelectItem>
+                            <SelectItem value="2">Axe 2 - Cartographie</SelectItem>
+                            <SelectItem value="3">Axe 3 - Procédures</SelectItem>
+                            <SelectItem value="4">Axe 4 - KPI</SelectItem>
+                            <SelectItem value="5">Axe 5 - Preuves</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Lien du fichier (Cloud/Local)</Label>
+                      <Input name="fileUrl" placeholder="https://..." />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={submitting}>
+                      {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Enregistrer
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
       />
 
       <Tabs defaultValue="5axes">
@@ -145,21 +214,10 @@ export default function Documentation() {
                           </div>
                         ))}
                       </div>
-                      <div className="mt-3 text-xs text-warning flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" /> L'IA détecte un goulot d'étranglement à l'étape "Contrôle Qualité".</div>
                     </CardContent></Card>
                 </TabsContent>
 
                 <TabsContent value="axe3" className="mt-4 space-y-3">
-                  <Card className="border-primary/20 bg-primary/5">
-                    <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Chat-with-Doc</CardTitle><CardDescription>Posez une question — l'IA répond en citant la bonne procédure.</CardDescription></CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex gap-2">
-                        <Input value={chatQ} onChange={e => setChatQ(e.target.value)} placeholder="Ex : Quelle est la procédure d'expédition internationale ?" onKeyDown={e => e.key === "Enter" && askAI()} />
-                        <Button onClick={askAI} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
-                      </div>
-                      {chatA && <div className="p-3 rounded-md bg-card border text-sm whitespace-pre-wrap">{chatA}</div>}
-                    </CardContent>
-                  </Card>
                   <Card><CardHeader><CardTitle className="text-base">Procédures & Instructions</CardTitle></CardHeader>
                     <CardContent className="space-y-2">
                       {docsInternes.filter(d => d.status === "vigueur").map(d => (
@@ -193,10 +251,10 @@ export default function Documentation() {
                 </TabsContent>
 
                 <TabsContent value="axe5" className="mt-4">
-                  <Card><CardHeader><CardTitle className="text-base">Axe 5 — Enregistrements & Preuves</CardTitle><CardDescription>Archivage intelligent par OCR et reconnaissance de mots-clés</CardDescription></CardHeader>
+                  <Card><CardHeader><CardTitle className="text-base">Axe 5 — Enregistrements & Preuves</CardTitle><CardDescription>Archivage des preuves de conformité</CardDescription></CardHeader>
                     <CardContent>
-                      <Textarea placeholder="Décrivez ou collez le contenu d'un enregistrement — l'IA classera automatiquement…" rows={4} />
-                      <Button className="mt-3" size="sm"><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Classer avec l'IA</Button>
+                      <Textarea placeholder="Décrivez le contenu d'un enregistrement…" rows={4} />
+                      <Button className="mt-3" size="sm">Classer l'enregistrement</Button>
                     </CardContent></Card>
                 </TabsContent>
               </Tabs>
@@ -269,7 +327,9 @@ export default function Documentation() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Documents externes</CardTitle>
-                <Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Ajouter</Button>
+                <DialogTrigger asChild>
+                  <Button size="sm"><Plus className="h-4 w-4 mr-1.5" />Ajouter</Button>
+                </DialogTrigger>
               </div>
               <CardDescription>Origine, lieu de classement, exigences applicables, déclinaison dans le SMQ</CardDescription>
             </CardHeader>

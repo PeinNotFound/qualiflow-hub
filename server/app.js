@@ -14,6 +14,10 @@ import documentationRoutes from "./routes/documentation.js";
 import revueRoutes from "./routes/revues.js";
 import planningRoutes from "./routes/planning.js";
 import veilleRoutes from "./routes/veille.js";
+import risqueRoutes from "./routes/risques.js";
+import metrologieRoutes from "./routes/metrologie.js";
+import partiesInteresseesRoutes from "./routes/parties_interessees.js";
+import notificationRoutes from "./routes/notifications.js";
 import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
@@ -41,6 +45,10 @@ app.use("/api/documentation", documentationRoutes);
 app.use("/api/revues", revueRoutes);
 app.use("/api/planning", planningRoutes);
 app.use("/api/veille", veilleRoutes);
+app.use("/api/risques", risqueRoutes);
+app.use("/api/metrologie", metrologieRoutes);
+app.use("/api/parties_interessees", partiesInteresseesRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 /**
  * 404 handler
