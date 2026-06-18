@@ -19,7 +19,7 @@ const router = express.Router();
 function signToken(user) {
   return jwt.sign(
     {
-      _id: user._id,
+      id: user._id,         // Fix #3 : utiliser "id" (cohérent avec middleware verifyToken)
       email: user.email,
       role: user.role,
       processus_id: user.processus_id,
@@ -50,13 +50,11 @@ router.get(
 /**
  * Register user
  *
- * Protected:
- * Only admin can create users
+ * Public route — auto-inscription
+ * Les admins peuvent aussi créer des comptes via cette route
  */
 router.post(
   "/register",
-  verifyToken,
-  checkRole("admin"),
 
   async (req, res) => {
 
@@ -64,6 +62,7 @@ router.post(
 
       const {
         name,
+        full_name,   // Fix #2 : accepter full_name (envoyé par le frontend)
         email,
         password,
         role,
@@ -72,10 +71,13 @@ router.post(
         site_id
       } = req.body;
 
-      if (!name || !email || !password) {
+      // Normaliser : accepter "name" ou "full_name"
+      const resolvedName = name || full_name;
+
+      if (!resolvedName || !email || !password) {
         return res.status(400).json({
           message:
-            "name, email, and password are required."
+            "name (ou full_name), email, et password sont requis."
         });
       }
 
@@ -105,7 +107,7 @@ router.post(
         await bcrypt.hash(password, 12);
 
       const user = await User.create({
-        name,
+        name: resolvedName,  // Fix #2 : utiliser le nom normalisé
         email,
         passwordHash,
         role: role ?? "operator",
